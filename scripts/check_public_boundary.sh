@@ -21,10 +21,10 @@ if git ls-files -o --exclude-standard | grep -E '(^|/)(\.claude|\.codex|\.cursor
   fail "private/generated agent or overlay paths are present as untracked public files"
 fi
 
-if git grep -n -E 'model-preflight-private|pylit-ai/model-preflight-private|enterprise-private|customer-specific|internal-only|proprietary agent' -- ':!AGENTS.md' ':!CLAUDE.md' ':!GEMINI.md' ':!.gitignore' ':!scripts/check_public_boundary.sh' >/tmp/model-preflight-public-boundary.$$; then
+if git grep -n -E 'customer-specific|internal-only|enterprise-only|proprietary overlay|proprietary agent|private provider|private overlay' -- ':!AGENTS.md' ':!CLAUDE.md' ':!GEMINI.md' ':!.gitignore' ':!scripts/check_public_boundary.sh' >/tmp/model-preflight-public-boundary.$$; then
   cat /tmp/model-preflight-public-boundary.$$ >&2
   rm -f /tmp/model-preflight-public-boundary.$$
-  fail "private overlay references found outside allowed public boundary docs"
+  fail "private/internal overlay references found outside allowed public boundary docs"
 fi
 rm -f /tmp/model-preflight-public-boundary.$$
 

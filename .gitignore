@@ -1,7 +1,7 @@
 /.metactl/
 /metactl.local.yaml
 
-# Private enterprise/agent overlays live in ../model-preflight-private.
+# Private/generated agent and overlay artifacts must not be committed here.
 /.claude/
 /.codex/
 /.cursor/

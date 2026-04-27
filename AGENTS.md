@@ -4,7 +4,9 @@
 
 This is the public ModelPreflight package repository.
 
-The sibling repository `../model-preflight-private` is a private enterprise overlay. Do not read from it, copy from it, reference it, or make this public repository depend on it unless the user explicitly asks to work on the private overlay.
+Do not add private, internal, customer-specific, enterprise-only, generated agent, or proprietary overlay material to this repository.
+
+If a task appears to require private/internal material, stop and ask for the correct private workspace instead of guessing, searching sibling directories, or adding references here.
 
 Public-safe content belongs here:
 
@@ -19,7 +21,7 @@ Private content does not belong here:
 - private provider routing, account names, private URLs, or secrets;
 - generated private agent adapters;
 - private specs, policies, or metactl projection state;
-- overlay patches or files sourced from `../model-preflight-private`.
+- private overlay patches or files.
 
 ## Required Checks
 
@@ -30,4 +32,4 @@ scripts/check_public_boundary.sh
 uv run pytest
 ```
 
-If a requested change seems private or ambiguous, keep it out of this repo and work from `../model-preflight-private` instead.
+If a requested change seems private or ambiguous, keep it out of this repo and ask for the correct private workspace.
