@@ -73,7 +73,11 @@ def run(
     path: Annotated[Path | None, typer.Option("--config")] = None,
 ) -> None:
     """Run project-local smoke cases."""
-    raw = [json.loads(line) for line in cases.read_text(encoding="utf-8").splitlines() if line.strip()]
+    raw = [
+        json.loads(line)
+        for line in cases.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     parsed = [SmokeCase.model_validate(row) for row in raw]
     results = run_smoke_cases(ModelGateway(load_config(path)), parsed)
     console.print_json(json.dumps([r.model_dump() for r in results], indent=2))

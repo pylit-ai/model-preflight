@@ -4,12 +4,21 @@
 
 A tiny local gateway for LLM smoke tests, provider failover, and cheap prototype checks.
 
+## Install
+
+```bash
+uvx model-preflight --help
+uv add --dev model-preflight
+# or
+pip install model-preflight
+```
+
 ## Install locally
 
 ```bash
 uv pip install -e .
 # or from another repo
-uv add --dev --editable /absolute/path/to/model-preflight-starter
+uv add --dev --editable /absolute/path/to/model-preflight
 ```
 
 ## Configure once per machine

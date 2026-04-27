@@ -21,6 +21,11 @@ dependencies = [
   "typer>=0.16",
 ]
 
+[project.urls]
+Homepage = "https://github.com/pylit-ai/model-preflight"
+Repository = "https://github.com/pylit-ai/model-preflight"
+Issues = "https://github.com/pylit-ai/model-preflight/issues"
+
 [project.optional-dependencies]
 dev = ["pytest>=8.4", "ruff>=0.12", "mypy>=1.17"]
 keyring = ["keyring>=25"]
