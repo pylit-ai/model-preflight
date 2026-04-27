@@ -1,0 +1,2 @@
+{"id":"arithmetic-smoke","prompt":"Return only the integer result: 17 + 25","expected_substrings":["42"],"forbidden_substrings":["I can't"]}
+{"id":"format-smoke","prompt":"Return JSON only: {\"ok\": true}","expected_substrings":["ok"],"forbidden_substrings":["```"]}

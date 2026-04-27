@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "model-preflight"
+version = "0.1.0"
+description = "Preflight checks for LLM prototypes."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "ModelPreflight contributors" }]
+keywords = ["llm", "smoke-tests", "prototypes", "litellm", "evals", "routing"]
+dependencies = [
+  "litellm>=1.75",
+  "pydantic>=2.7,<3",
+  "pydantic-settings>=2.4",
+  "platformdirs>=4.3",
+  "PyYAML>=6.0",
+  "rich>=13.7",
+  "typer>=0.16",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.4", "ruff>=0.12", "mypy>=1.17"]
+keyring = ["keyring>=25"]
+
+[project.scripts]
+mpf = "model_preflight.cli:app"
+model-preflight = "model_preflight.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/model_preflight"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
