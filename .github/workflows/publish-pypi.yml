@@ -36,6 +36,10 @@ jobs:
         with:
           cache-dependency-glob: pyproject.toml
 
+      - name: Check tag matches package version
+        if: github.ref_type == 'tag'
+        run: python scripts/check_version_tag.py "$GITHUB_REF_NAME"
+
       - name: Build
         run: uv build
 
