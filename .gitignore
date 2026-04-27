@@ -1,0 +1,17 @@
+/.metactl/
+/metactl.local.yaml
+
+# Private enterprise/agent overlays live in ../model-preflight-private.
+/.claude/
+/.codex/
+/.cursor/
+/.gemini/
+/AGENTS.local.md
+/CLAUDE.local.md
+/GEMINI.local.md
+/.enterprise/
+/.meta/private/
+
+# Local verification artifacts for this public package checkout.
+/uv.lock
+__pycache__/
