@@ -9,61 +9,18 @@ from platformdirs import user_cache_path, user_config_path
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .preset_registry import preset_for_provider, preset_text
+
 APP_NAME = "model-preflight"
 
-DEFAULT_CONFIG_TEXT = """version: "1"
-router:
-  num_retries: 1
-  timeout_seconds: 60
-  default_group: free_reasoning
-  audit_jsonl: null
-artifacts_dir: ~/.cache/model-preflight/artifacts
-
-deployments:
-  # Exact model ids change. Pin these after checking each provider's current catalog.
-  - name: openrouter_gpt_oss_120b_free
-    group: free_reasoning
-    model: openrouter/openai/gpt-oss-120b:free
-    api_key_env: OPENROUTER_API_KEY
-    rpm: 18
-    tier: reasoning
-
-  - name: groq_gpt_oss_120b
-    group: free_fast
-    model: groq/openai/gpt-oss-120b
-    api_key_env: GROQ_API_KEY
-    rpm: 10
-    tier: fast
-
-  - name: cerebras_gpt_oss_120b
-    group: free_fast
-    model: cerebras/gpt-oss-120b
-    api_key_env: CEREBRAS_API_KEY
-    rpm: 10
-    tier: fast
-
-  - name: mistral_large_experiment
-    group: free_reasoning
-    model: mistral/mistral-large-latest
-    api_key_env: MISTRAL_API_KEY
-    rpm: 5
-    tier: reasoning
-
-  # Confirm current NVIDIA NIM LiteLLM model prefix/catalog slug before enabling.
-  - name: nvidia_nim_gpt_oss_120b
-    enabled: false
-    group: free_reasoning
-    model: nvidia_nim/openai/gpt-oss-120b
-    api_key_env: NVIDIA_NIM_API_KEY
-    rpm: 5
-    tier: reasoning
-"""
+DEFAULT_PRESET = "openrouter"
 
 
 class Deployment(BaseModel):
     """One concrete provider/model deployment exposed under a logical group."""
 
     name: str
+    provider: str | None = None
     group: str = "free_reasoning"
     model: str
     api_key_env: str | None = None
@@ -71,6 +28,9 @@ class Deployment(BaseModel):
     rpm: int | None = None
     tpm: int | None = None
     enabled: bool = True
+    required: bool = True
+    status: Literal["required", "optional", "best_effort", "offline"] = "required"
+    setup_url: str | None = None
     tier: Literal["reasoning", "fast", "baseline", "judge"] = "reasoning"
 
     @field_validator("name", "group", "model")
@@ -127,18 +87,56 @@ def load_config(path: Path | str | None = None) -> AppConfig:
     return cfg
 
 
-def write_default_config(path: Path | str | None = None, *, overwrite: bool = False) -> Path:
+def write_default_config(
+    path: Path | str | None = None,
+    *,
+    overwrite: bool = False,
+    preset: str | None = None,
+    provider: str | None = None,
+) -> Path:
     out = Path(path).expanduser() if path is not None else default_config_path()
     if out.exists() and not overwrite:
         return out
+    preset_name = preset_for_provider(provider) if provider else (preset or DEFAULT_PRESET)
+    text = preset_text(preset_name)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(DEFAULT_CONFIG_TEXT, encoding="utf-8")
+    out.write_text(text, encoding="utf-8")
     return out
 
 
-def missing_env_vars(config: AppConfig) -> list[str]:
-    missing: list[str] = []
+def selected_deployments(
+    config: AppConfig,
+    *,
+    group: str | None = None,
+    provider: str | None = None,
+    include_disabled: bool = False,
+) -> list[Deployment]:
+    selected: list[Deployment] = []
+    effective_group = group
+    if effective_group is None and provider is None:
+        effective_group = config.router.default_group
     for dep in config.deployments:
-        if dep.enabled and dep.api_key_env and not os.getenv(dep.api_key_env):
+        if not include_disabled and not dep.enabled:
+            continue
+        if effective_group is not None and dep.group != effective_group:
+            continue
+        if provider is not None and dep.provider != provider:
+            continue
+        selected.append(dep)
+    return selected
+
+
+def missing_env_vars(
+    config: AppConfig,
+    *,
+    group: str | None = None,
+    provider: str | None = None,
+    required_only: bool = True,
+) -> list[str]:
+    missing: list[str] = []
+    for dep in selected_deployments(config, group=group, provider=provider):
+        if required_only and not dep.required:
+            continue
+        if dep.api_key_env and not os.getenv(dep.api_key_env):
             missing.append(dep.api_key_env)
     return sorted(set(missing))

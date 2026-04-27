@@ -1,0 +1,20 @@
+version: "1"
+router:
+  num_retries: 1
+  timeout_seconds: 60
+  default_group: free_reasoning
+  audit_jsonl: null
+artifacts_dir: ~/.cache/model-preflight/artifacts
+
+deployments:
+  - name: openrouter_gpt_oss_120b_free
+    provider: openrouter
+    group: free_reasoning
+    model: openrouter/openai/gpt-oss-120b:free
+    api_key_env: OPENROUTER_API_KEY
+    enabled: true
+    required: true
+    status: best_effort
+    setup_url: https://openrouter.ai/docs/api-reference/authentication
+    rpm: 18
+    tier: reasoning

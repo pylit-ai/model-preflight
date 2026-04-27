@@ -1,0 +1,17 @@
+version: "1"
+router:
+  num_retries: 0
+  timeout_seconds: 10
+  default_group: offline_echo
+  audit_jsonl: null
+artifacts_dir: ~/.cache/model-preflight/artifacts
+
+deployments:
+  - name: offline_echo
+    provider: offline
+    group: offline_echo
+    model: offline/echo
+    enabled: true
+    required: false
+    status: offline
+    tier: baseline

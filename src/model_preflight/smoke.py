@@ -36,6 +36,15 @@ def score_case(case: SmokeCase, text: str) -> SmokeResult:
 def run_smoke_cases(gateway: ModelGateway, cases: list[SmokeCase]) -> list[SmokeResult]:
     results: list[SmokeResult] = []
     for case in cases:
-        text = gateway.text(case.prompt, group=case.group, temperature=case.temperature)
+        text = gateway.text(
+            case.prompt,
+            group=case.group,
+            temperature=case.temperature,
+            metadata={
+                "runner": "smoke",
+                "case_id": case.id,
+                "case_group": case.group,
+            },
+        )
         results.append(score_case(case, text))
     return results

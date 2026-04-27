@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "timestamp": "2026-04-27T22:48:28Z",
+  "branch": "main",
+  "commit": "c0396cc",
+  "task_id": "modelpreflight-first-run-ux-release-readiness",
+  "overall_status": "READY_WITH_WARNINGS",
+  "readiness_target": "First-run UX and package release readiness with offline verification complete and optional live-provider evidence pending credentials.",
+  "objective_sources": [
+    {
+      "path": "docs/first-run-ux-contract.md",
+      "precedence_layer": "project objective",
+      "summary": "Defines first-run command contract, MUST requirements, and deferred provider-add behavior.",
+      "freshness": "current"
+    },
+    {
+      "path": "README.md",
+      "precedence_layer": "project docs",
+      "summary": "Documents 60-second start, no-key demo path, provider setup, and project smoke flow.",
+      "freshness": "current"
+    },
+    {
+      "path": "docs/release-verification.md",
+      "precedence_layer": "release gate",
+      "summary": "Lists offline and optional live verification commands.",
+      "freshness": "current"
+    }
+  ],
+  "axes": [
+    {
+      "id": "AXIS-UX",
+      "name": "First-run UX behavior",
+      "score": 0.92,
+      "confidence": 0.9,
+      "status": "PASS",
+      "cap": 0.95,
+      "top_limiter": "Remote one-key live transcript not run because no provider credential was established."
+    },
+    {
+      "id": "AXIS-TEST",
+      "name": "Automated verification",
+      "score": 1.0,
+      "confidence": 0.95,
+      "status": "PASS",
+      "cap": 1.0,
+      "top_limiter": "No blocker."
+    },
+    {
+      "id": "AXIS-DOCS",
+      "name": "Documentation alignment",
+      "score": 0.9,
+      "confidence": 0.88,
+      "status": "PASS",
+      "cap": 0.95,
+      "top_limiter": "Provider pricing/catalog claims remain intentionally best-effort."
+    },
+    {
+      "id": "AXIS-LIVE",
+      "name": "Live provider evidence",
+      "score": 0.6,
+      "confidence": 0.55,
+      "status": "UNVERIFIED",
+      "cap": 0.7,
+      "top_limiter": "OPENROUTER_API_KEY or equivalent live credential not provided."
+    }
+  ],
+  "gates": [
+    {
+      "id": "G-001",
+      "axis": "AXIS-UX",
+      "requirement": "Provider-scoped init writes one required OpenRouter deployment.",
+      "priority": "MUST_PASS",
+      "status": "PASS",
+      "verifiability": "V1",
+      "evidence": "tests/test_config_presets.py::test_provider_init_writes_one_required_openrouter_deployment"
+    },
+    {
+      "id": "G-002",
+      "axis": "AXIS-UX",
+      "requirement": "No-key minimal path works through init, doctor --live, demo, init-project, and run.",
+      "priority": "MUST_PASS",
+      "status": "PASS",
+      "verifiability": "V1/V2",
+      "evidence": "tests/test_cli_first_run.py::test_init_minimal_demo_init_project_and_run plus temp-dir transcript"
+    },
+    {
+      "id": "G-003",
+      "axis": "AXIS-UX",
+      "requirement": "Doctor fails only required selected deployments and gives actionable missing-key recovery.",
+      "priority": "MUST_PASS",
+      "status": "PASS",
+      "verifiability": "V1",
+      "evidence": "tests/test_config_presets.py and tests/test_cli_first_run.py"
+    },
+    {
+      "id": "G-004",
+      "axis": "AXIS-UX",
+      "requirement": "Installed users do not depend on examples/smoke_cases.jsonl for demo or default run.",
+      "priority": "MUST_PASS",
+      "status": "PASS",
+      "verifiability": "V1/V2",
+      "evidence": "temp-dir no-key transcript; rg found no stale examples/smoke_cases first-run reference"
+    },
+    {
+      "id": "G-005",
+      "axis": "AXIS-TEST",
+      "requirement": "Lint, tests, typecheck, and package build pass.",
+      "priority": "MUST_PASS",
+      "status": "PASS",
+      "verifiability": "V1",
+      "evidence": "uv run ruff check .; uv run pytest -q; uv run mypy src; uv build"
+    },
+    {
+      "id": "G-006",
+      "axis": "AXIS-TEST",
+      "requirement": "Wheel includes packaged preset YAML files.",
+      "priority": "MUST_PASS",
+      "status": "PASS",
+      "verifiability": "V1",
+      "evidence": "wheel inspection listed model_preflight/presets/*.yaml"
+    },
+    {
+      "id": "G-007",
+      "axis": "AXIS-LIVE",
+      "requirement": "One-provider OpenRouter live transcript completes under the activation target.",
+      "priority": "OPTIONAL_DIAGNOSTIC",
+      "status": "UNVERIFIED",
+      "verifiability": "V2",
+      "evidence": "Not run; requires operator-provided OPENROUTER_API_KEY."
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "command",
+      "command": "uv run ruff check .",
+      "result": "PASS"
+    },
+    {
+      "id": "E-002",
+      "kind": "command",
+      "command": "uv run pytest -q",
+      "result": "PASS: 13 passed"
+    },
+    {
+      "id": "E-003",
+      "kind": "command",
+      "command": "uv run mypy src",
+      "result": "PASS: no issues found in 9 source files"
+    },
+    {
+      "id": "E-004",
+      "kind": "command",
+      "command": "uv build",
+      "result": "PASS: wheel and sdist built"
+    },
+    {
+      "id": "E-005",
+      "kind": "runtime_transcript",
+      "command": "temp-dir minimal init -> doctor --live -> demo -> init-project -> run",
+      "result": "PASS"
+    },
+    {
+      "id": "E-006",
+      "kind": "package_inspection",
+      "command": "uv run python zipfile inspection",
+      "result": "PASS: minimal.yaml, openrouter.yaml, multi-free-dev.yaml included"
+    }
+  ],
+  "regressions": [],
+  "blockers": [],
+  "loop_closure_queue": [
+    {
+      "rank": 1,
+      "action": "Run optional OpenRouter live transcript with operator-provided OPENROUTER_API_KEY.",
+      "closure_score": 3.65,
+      "closes": ["G-007"]
+    },
+    {
+      "rank": 2,
+      "action": "Add CI packaging artifact inspection if package-data drift recurs.",
+      "closure_score": 2.85,
+      "closes": ["G-006"]
+    },
+    {
+      "rank": 3,
+      "action": "Add structured JSON output for doctor/providers if agents need machine parsing beyond exit codes.",
+      "closure_score": 2.5,
+      "closes": []
+    }
+  ],
+  "pressing_questions": [],
+  "harness_recommendations": [
+    "Promote docs/release-verification.md commands into a single Make or script target if this package gains more gates.",
+    "Keep live provider validation optional in CI unless a credentialed environment is explicitly provisioned."
+  ],
+  "open_risks": [
+    "Provider catalogs, pricing, and rate limits can drift outside repo control.",
+    "Remote live behavior is not verified in this run because credentials were not established."
+  ]
+}

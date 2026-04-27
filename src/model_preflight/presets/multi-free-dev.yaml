@@ -1,0 +1,56 @@
+version: "1"
+router:
+  num_retries: 1
+  timeout_seconds: 60
+  default_group: free_reasoning
+  audit_jsonl: null
+artifacts_dir: ~/.cache/model-preflight/artifacts
+
+deployments:
+  - name: openrouter_gpt_oss_120b_free
+    provider: openrouter
+    group: free_reasoning
+    model: openrouter/openai/gpt-oss-120b:free
+    api_key_env: OPENROUTER_API_KEY
+    enabled: true
+    required: true
+    status: best_effort
+    setup_url: https://openrouter.ai/docs/api-reference/authentication
+    rpm: 18
+    tier: reasoning
+
+  - name: groq_gpt_oss_120b
+    provider: groq
+    group: free_fast
+    model: groq/openai/gpt-oss-120b
+    api_key_env: GROQ_API_KEY
+    enabled: false
+    required: false
+    status: optional
+    setup_url: https://console.groq.com/docs/quickstart
+    rpm: 10
+    tier: fast
+
+  - name: cerebras_gpt_oss_120b
+    provider: cerebras
+    group: free_fast
+    model: cerebras/gpt-oss-120b
+    api_key_env: CEREBRAS_API_KEY
+    enabled: false
+    required: false
+    status: optional
+    setup_url: https://inference-docs.cerebras.ai
+    rpm: 10
+    tier: fast
+
+  - name: mistral_large_experiment
+    provider: mistral
+    group: free_reasoning
+    model: mistral/mistral-large-latest
+    api_key_env: MISTRAL_API_KEY
+    enabled: false
+    required: false
+    status: optional
+    setup_url: https://docs.mistral.ai
+    rpm: 5
+    tier: reasoning

@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from .router import ModelGateway
+
+
+@dataclass(frozen=True)
+class CandidateResult:
+    index: int
+    ok: bool
+    text: str = ""
+    error: str | None = None
 
 
 def fanout(
@@ -15,8 +24,8 @@ def fanout(
     temperature: float = 0.9,
     max_workers: int = 16,
     max_tokens: int | None = None,
-) -> list[str]:
-    results = [""] * n
+) -> list[CandidateResult]:
+    results: list[CandidateResult] = [CandidateResult(index=i, ok=False) for i in range(n)]
     workers = min(max_workers, n)
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futs = {
@@ -32,7 +41,10 @@ def fanout(
         }
         for fut in as_completed(futs):
             idx = futs[fut]
-            results[idx] = fut.result()
+            try:
+                results[idx] = CandidateResult(index=idx, ok=True, text=fut.result())
+            except Exception as exc:  # noqa: BLE001 - preserve provider failure detail for callers.
+                results[idx] = CandidateResult(index=idx, ok=False, error=str(exc))
     return results
 
 
@@ -77,7 +89,7 @@ def pro_mode(
     max_workers: int = 16,
     max_tokens: int | None = None,
 ) -> dict[str, Any]:
-    candidates = fanout(
+    candidate_results = fanout(
         gateway,
         prompt,
         group=sample_group,
@@ -85,16 +97,24 @@ def pro_mode(
         max_workers=max_workers,
         max_tokens=max_tokens,
     )
-    nonempty = [c for c in candidates if c.strip()]
+    nonempty = [c.text for c in candidate_results if c.ok and c.text.strip()]
     if not nonempty:
         raise RuntimeError("all candidate generations were empty")
     if len(nonempty) <= tournament_group_size:
         final = synthesize(gateway, prompt, nonempty, group=judge_group, max_tokens=max_tokens)
-        return {"final": final, "candidates": candidates, "group_winners": []}
+        return {
+            "final": final,
+            "candidates": [asdict(c) for c in candidate_results],
+            "group_winners": [],
+        }
     winners = []
     for i in range(0, len(nonempty), tournament_group_size):
         winners.append(
             synthesize(gateway, prompt, nonempty[i : i + tournament_group_size], group=judge_group)
         )
     final = synthesize(gateway, prompt, winners, group=judge_group, max_tokens=max_tokens)
-    return {"final": final, "candidates": candidates, "group_winners": winners}
+    return {
+        "final": final,
+        "candidates": [asdict(c) for c in candidate_results],
+        "group_winners": winners,
+    }

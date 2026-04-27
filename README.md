@@ -16,7 +16,8 @@
 
 | If you want to... | Start here |
 |-------------------|------------|
-| Try it in a few commands | [Quick start](#quick-start) |
+| Get one green check quickly | [60-second start](#60-second-start) |
+| Try it without keys | [No-key demo path](#no-key-demo-path) |
 | Configure provider groups once | [Machine-local config](#machine-local-config) |
 | Run project smoke cases | [Smoke tests](#smoke-tests) |
 | Fan out a one-off prompt | [Pro Mode](#pro-mode) |
@@ -73,7 +74,7 @@ Bundled provider presets are starter data. Check each provider's current catalog
 
 </details>
 
-## Quick start
+## 60-second start
 
 ```bash
 uvx model-preflight --help
@@ -84,27 +85,41 @@ uv tool install model-preflight
 pipx install model-preflight
 ```
 
-Configure once per machine:
+Pick one provider, set one key, and run one live check:
 
 ```bash
-mpf init
-$EDITOR ~/.config/model-preflight/config.yaml
+mpf init --provider openrouter
 export OPENROUTER_API_KEY=...
-export GROQ_API_KEY=...
-export CEREBRAS_API_KEY=...
-export MISTRAL_API_KEY=...
-mpf doctor
+mpf doctor --live
+mpf demo
 ```
 
-Run it in a project:
+Add checks to a project:
 
 ```bash
-mpf models
-mpf run examples/smoke_cases.jsonl
-mpf pro "Return a robust answer to this toy task" --n 8
+cd my-project
+mpf init-project
+mpf run
 ```
 
 Both `mpf` and `model-preflight` are installed as console scripts.
+
+ModelPreflight catches missing keys, broken provider routes, prompt formatting regressions,
+output-shape drift, accidental model/provider changes, and "this worked yesterday" prototype
+failures before you wire the LLM call into something larger.
+
+## No-key demo path
+
+Use the minimal offline preset when you want to test the CLI and project workflow without a provider
+account:
+
+```bash
+mpf init --preset minimal
+mpf doctor --live
+mpf demo
+mpf init-project
+mpf run
+```
 
 <details open>
 <summary><img src="./docs/assets/readme-icons/route.svg" height="24" align="center" alt=""> <b>Install options</b></summary>
@@ -147,7 +162,7 @@ ModelPreflight requires Python 3.11+.
 ModelPreflight reads provider routes from `~/.config/model-preflight/config.yaml` by default. Override the path with either `--config` or `MODEL_PREFLIGHT_CONFIG`.
 
 ```bash
-mpf init
+mpf init --provider openrouter
 mpf doctor
 mpf models
 ```
@@ -163,12 +178,17 @@ router:
 artifacts_dir: ~/.cache/model-preflight/artifacts
 
 deployments:
-  - name: groq_gpt_oss_120b
-    group: free_fast
-    model: groq/openai/gpt-oss-120b
-    api_key_env: GROQ_API_KEY
-    rpm: 10
-    tier: fast
+  - name: openrouter_gpt_oss_120b_free
+    provider: openrouter
+    group: free_reasoning
+    model: openrouter/openai/gpt-oss-120b:free
+    api_key_env: OPENROUTER_API_KEY
+    enabled: true
+    required: true
+    status: best_effort
+    setup_url: https://openrouter.ai/docs/api-reference/authentication
+    rpm: 18
+    tier: reasoning
 ```
 
 <details>
@@ -178,6 +198,7 @@ Provider presets are best-effort starter data, not authoritative claims about fr
 
 - user-local config wins over bundled defaults
 - `mpf doctor` fails fast when required keys are missing
+- optional/disabled providers do not block first-run checks
 - live checks should be opt-in in CI
 - endpoint names, quotas, pricing, and behavior can change without this repo knowing
 
@@ -191,6 +212,7 @@ See [`docs/PROVIDER_PRESETS.md`](./docs/PROVIDER_PRESETS.md) for the preset rule
 ```bash
 mpf init --config ./model-preflight.yaml
 mpf doctor --config ./model-preflight.yaml
+mpf doctor --config ./model-preflight.yaml --live
 
 export MODEL_PREFLIGHT_CONFIG="$PWD/model-preflight.yaml"
 mpf models
@@ -214,7 +236,9 @@ Smoke cases are JSONL files owned by the project that is doing the prototype wor
 Run them with:
 
 ```bash
-mpf run examples/smoke_cases.jsonl
+mpf run
+# or:
+mpf run path/to/smoke_cases.jsonl
 ```
 
 `mpf run` prints JSON results and exits non-zero if any case fails.
@@ -319,10 +343,14 @@ See [`docs/EVAL_PROVENANCE.md`](./docs/EVAL_PROVENANCE.md) for provenance expect
 <summary><strong>Command reference</strong></summary>
 
 ```bash
-mpf init
-mpf doctor
+mpf init --provider openrouter
+mpf doctor --live
+mpf demo
+mpf init-project
+mpf run
+mpf providers list
+mpf providers guide openrouter
 mpf models
-mpf run evals/smoke.jsonl
 mpf pro "solve this toy task" --n 8
 ```
 
