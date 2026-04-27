@@ -1,3 +1,41 @@
+### OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+### Python caches and test artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+
+### Virtualenvs and local environments
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+### Build/package outputs
+build/
+dist/
+*.egg-info/
+
+### ModelPreflight local runtime artifacts
+.model-preflight/
+model-preflight.yaml
+model-preflight.local.yaml
+artifacts/
+
+### Local metactl state
 /.metactl/
 /metactl.local.yaml
 
@@ -14,4 +52,3 @@
 
 # Local verification artifacts for this public package checkout.
 /uv.lock
-__pycache__/

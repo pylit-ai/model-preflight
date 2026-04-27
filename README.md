@@ -1,6 +1,6 @@
 <div align="center">
 
-# <img src="https://img.shields.io/badge/--16a34a?style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZwogIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIKICB3aWR0aD0iMjQiCiAgaGVpZ2h0PSIyNCIKICB2aWV3Qm94PSIwIDAgMjQgMjQiCiAgZmlsbD0ibm9uZSIKICBzdHJva2U9IndoaXRlIgogIHN0cm9rZS13aWR0aD0iMiIKICBzdHJva2UtbGluZWNhcD0icm91bmQiCiAgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIKPgogIDxwYXRoIGQ9Ik0xMiAyMmg4IiAvPgogIDxwYXRoIGQ9Ik0xMiAxOHYtNCIgLz4KICA8cGF0aCBkPSJNMTIgMTRhNyA3IDAgMSAwLTcgNyIgLz4KICA8cGF0aCBkPSJNMTUgOWwtMyAzLTMtMyIgLz4KPC9zdmc%2BCg%3D%3D" height="48" align="center"> **ModelPreflight**
+# <img src="./docs/assets/readme-icons/preflight.svg" height="48" align="center" alt=""> **ModelPreflight**
 
 **Preflight checks for LLM prototypes.**
 
@@ -11,6 +11,8 @@
 [![PyPI version](https://img.shields.io/pypi/v/model-preflight?label=PyPI)](https://pypi.org/project/model-preflight/)
 ![License](https://img.shields.io/badge/license-Apache--2.0-lightgrey.svg)
 ![LiteLLM](https://img.shields.io/badge/router-LiteLLM-informational)
+
+<img src="./docs/assets/hero.png" alt="ModelPreflight hero image" width="900">
 
 | If you want to... | Start here |
 |-------------------|------------|
@@ -29,7 +31,7 @@ ModelPreflight keeps provider setup **machine-local** and keeps smoke cases **pr
 ---
 
 <details>
-<summary><img src="https://img.shields.io/badge/--0ea5e9?style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZwogIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZyIKICB3aWR0aD0iMjQiCiAgaGVpZ2h0PSIyNCIKICB2aWV3Qm94PSIwIDAgMjQgMjQiCiAgZmlsbD0ibm9uZSIKICBzdHJva2U9IndoaXRlIgogIHN0cm9rZS13aWR0aD0iMiIKICBzdHJva2UtbGluZWNhcD0icm91bmQiCiAgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIKPgogIDxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIiAvPgogIDxwYXRoIGQ9Ik0xMiAxNnYtNCIgLz4KICA8cGF0aCBkPSJNMTIgOGguMDEiIC8%2BCjwvc3ZnPgo%3D" height="24" align="center"> <b>Why this repo exists</b></summary>
+<summary><img src="./docs/assets/readme-icons/info.svg" height="24" align="center" alt=""> <b>Why this repo exists</b></summary>
 
 Early LLM prototypes often need a quick answer to a practical question: "Can this prompt, model group, or provider route work well enough to keep building?"
 
@@ -44,7 +46,7 @@ ModelPreflight gives you a lightweight layer for that stage:
 </details>
 
 <details>
-<summary><img src="https://img.shields.io/badge/--9ca3af?style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZwogIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZyIKICB3aWR0aD0iMjQiCiAgaGVpZ2h0PSIyNCIKICB2aWV3Qm94PSIwIDAgMjQgMjQiCiAgZmlsbD0ibm9uZSIKICBzdHJva2U9IndoaXRlIgogIHN0cm9rZS13aWR0aD0iMiIKICBzdHJva2UtbGluZWNhcD0icm91bmQiCiAgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIKPgogIDxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIiAvPgogIDxwYXRoIGQ9Im05IDEyIDIgMiA0LTQiIC8%2BCjwvc3ZnPgo%3D" height="24" align="center"> <b>When to use it</b></summary>
+<summary><img src="./docs/assets/readme-icons/check.svg" height="24" align="center" alt=""> <b>When to use it</b></summary>
 
 Use ModelPreflight when:
 
@@ -57,7 +59,7 @@ Use ModelPreflight when:
 </details>
 
 <details>
-<summary><img src="https://img.shields.io/badge/--f97316?style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZwogIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZyIKICB3aWR0aD0iMjQiCiAgaGVpZ2h0PSIyNCIKICB2aWV3Qm94PSIwIDAgMjQgMjQiCiAgZmlsbD0ibm9uZSIKICBzdHJva2U9IndoaXRlIgogIHN0cm9rZS13aWR0aD0iMiIKICBzdHJva2UtbGluZWNhcD0icm91bmQiCiAgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIKPgogIDxwYXRoIGQ9Im0yMS43MyAxOC04LTE0YTIgMiAwIDAgMC0zLjQ4IDBsLTggMTRBMiAyIDAgMCAwIDQgMjFoMTZhMiAyIDAgMCAwIDEuNzMtMyIgLz4KICA8cGF0aCBkPSJNMTIgOXY0IiAvPgogIDxwYXRoIGQ9Ik0xMiAxN2guMDEiIC8%2BCjwvc3ZnPgo%3D" height="24" align="center"> <b>What it is not</b></summary>
+<summary><img src="./docs/assets/readme-icons/alert.svg" height="24" align="center" alt=""> <b>What it is not</b></summary>
 
 ModelPreflight is not:
 
@@ -105,7 +107,7 @@ mpf pro "Return a robust answer to this toy task" --n 8
 Both `mpf` and `model-preflight` are installed as console scripts.
 
 <details open>
-<summary><img src="https://img.shields.io/badge/--4f46e5?style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZwogIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZyIKICB3aWR0aD0iMjQiCiAgaGVpZ2h0PSIyNCIKICB2aWV3Qm94PSIwIDAgMjQgMjQiCiAgZmlsbD0ibm9uZSIKICBzdHJva2U9IndoaXRlIgogIHN0cm9rZS13aWR0aD0iMiIKICBzdHJva2UtbGluZWNhcD0icm91bmQiCiAgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIKPgogIDxsaW5lIHgxPSI2IiB4Mj0iNiIgeTE9IjMiIHkyPSIxNSIgLz4KICA8Y2lyY2xlIGN4PSIxOCIgY3k9IjYiIHI9IjMiIC8%2BCiAgPGNpcmNsZSBjeD0iNiIgY3k9IjE4IiByPSIzIiAvPgogIDxwYXRoIGQ9Ik0xOCA5YTkgOSAwIDAgMS05IDkiIC8%2BCjwvc3ZnPgo%3D" height="24" align="center"> <b>Install options</b></summary>
+<summary><img src="./docs/assets/readme-icons/route.svg" height="24" align="center" alt=""> <b>Install options</b></summary>
 
 **PyPI or isolated tool install**
 
@@ -170,7 +172,7 @@ deployments:
 ```
 
 <details>
-<summary><img src="https://img.shields.io/badge/--64748b?style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZwogIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZyIKICB3aWR0aD0iMjQiCiAgaGVpZ2h0PSIyNCIKICB2aWV3Qm94PSIwIDAgMjQgMjQiCiAgZmlsbD0ibm9uZSIKICBzdHJva2U9IndoaXRlIgogIHN0cm9rZS13aWR0aD0iMiIKICBzdHJva2UtbGluZWNhcD0icm91bmQiCiAgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIKPgogIDxwYXRoIGQ9Ik05LjY3MSA0LjEzNmEyLjM0IDIuMzQgMCAwIDEgNC42NTkgMCAyLjM0IDIuMzQgMCAwIDAgMy4zMTkgMS45MTUgMi4zNCAyLjM0IDAgMCAxIDIuMzMgNC4wMzMgMi4zNCAyLjM0IDAgMCAwIDAgMy44MzEgMi4zNCAyLjM0IDAgMCAxLTIuMzMgNC4wMzMgMi4zNCAyLjM0IDAgMCAwLTMuMzE5IDEuOTE1IDIuMzQgMi4zNCAwIDAgMS00LjY1OSAwIDIuMzQgMi4zNCAwIDAgMC0zLjMyLTMuOTE1IDIuMzQgMi4zNCAwIDAgMS0yLjMzLTQuMDMzIDIuMzQgMi4zNCAwIDAgMCAwLTMuODMxQTIuMzQgMi4zNCAwIDAgMSA2LjM1IDYuMDUxYTIuMzQgMi4zNCAwIDAgMCAzLjMxOS0xLjkxNSIgLz4KICA8Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIzIiAvPgo8L3N2Zz4K" height="24" align="center"> <b>Provider preset discipline</b></summary>
+<summary><img src="./docs/assets/readme-icons/settings.svg" height="24" align="center" alt=""> <b>Provider preset discipline</b></summary>
 
 Provider presets are best-effort starter data, not authoritative claims about free availability.
 
@@ -184,7 +186,7 @@ See [`docs/PROVIDER_PRESETS.md`](./docs/PROVIDER_PRESETS.md) for the preset rule
 </details>
 
 <details>
-<summary><img src="https://img.shields.io/badge/--06b6d4?style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZwogIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZyIKICB3aWR0aD0iMjQiCiAgaGVpZ2h0PSIyNCIKICB2aWV3Qm94PSIwIDAgMjQgMjQiCiAgZmlsbD0ibm9uZSIKICBzdHJva2U9IndoaXRlIgogIHN0cm9rZS13aWR0aD0iMiIKICBzdHJva2UtbGluZWNhcD0icm91bmQiCiAgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIKPgogIDxyZWN0IHdpZHRoPSI3IiBoZWlnaHQ9IjciIHg9IjMiIHk9IjMiIHJ4PSIxIiAvPgogIDxyZWN0IHdpZHRoPSI3IiBoZWlnaHQ9IjciIHg9IjE0IiB5PSIzIiByeD0iMSIgLz4KICA8cmVjdCB3aWR0aD0iNyIgaGVpZ2h0PSI3IiB4PSIxNCIgeT0iMTQiIHJ4PSIxIiAvPgogIDxyZWN0IHdpZHRoPSI3IiBoZWlnaHQ9IjciIHg9IjMiIHk9IjE0IiByeD0iMSIgLz4KPC9zdmc%2BCg%3D%3D" height="24" align="center"> <b>Custom config path</b></summary>
+<summary><img src="./docs/assets/readme-icons/grid.svg" height="24" align="center" alt=""> <b>Custom config path</b></summary>
 
 ```bash
 mpf init --config ./model-preflight.yaml
@@ -251,7 +253,7 @@ Defaults:
 | `--judge-group` | `free_reasoning` | synthesis group |
 
 <details>
-<summary><img src="https://img.shields.io/badge/--f59e0b?style=flat&logo=lightning&logoColor=white" height="24" align="center"> <b>Cost and quota note</b></summary>
+<summary><img src="./docs/assets/readme-icons/lightning.svg" height="24" align="center" alt=""> <b>Cost and quota note</b></summary>
 
 Fanout multiplies live provider calls. Keep `--n` low while testing, use restricted provider keys where available, and review provider dashboards when running against paid endpoints.
 
@@ -351,4 +353,3 @@ Package metadata lives in [`pyproject.toml`](./pyproject.toml). Tests live under
 - Deterministic tests should run before live provider checks.
 
 For the product scope and non-goals, see [`docs/NORTHSTAR.md`](./docs/NORTHSTAR.md).
-
