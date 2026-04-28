@@ -281,6 +281,9 @@ mpf models
 
 Use environment variables for secrets. Do not commit provider keys.
 
+If you use 1Password, see [`docs/secrets/1password.md`](docs/secrets/1password.md)
+for `op run` examples and an optional vault helper.
+
 </details>
 
 ---
