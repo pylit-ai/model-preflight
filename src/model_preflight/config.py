@@ -13,7 +13,7 @@ from .preset_registry import preset_for_provider, preset_text
 
 APP_NAME = "model-preflight"
 
-DEFAULT_PRESET = "openrouter"
+DEFAULT_PRESET = "nvidia"
 
 
 class Deployment(BaseModel):

@@ -5,6 +5,7 @@ from importlib import resources
 
 PROVIDER_TO_PRESET = {
     "minimal": "minimal",
+    "nvidia": "nvidia",
     "openrouter": "openrouter",
     "groq": "multi-free-dev",
     "cerebras": "multi-free-dev",
@@ -23,6 +24,14 @@ class ProviderInfo:
 
 
 PROVIDERS: dict[str, ProviderInfo] = {
+    "nvidia": ProviderInfo(
+        id="nvidia",
+        name="NVIDIA Build / NIM",
+        preset="nvidia",
+        env_vars=("NVIDIA_NIM_API_KEY",),
+        setup_url="https://build.nvidia.com/settings/api-keys",
+        best_for="Primary high-capability open/open-weight endpoint pool.",
+    ),
     "openrouter": ProviderInfo(
         id="openrouter",
         name="OpenRouter",

@@ -30,7 +30,7 @@ mpf run
 
 | ID | Requirement | Evidence |
 |----|-------------|----------|
-| UX-001 | First remote setup requires one provider and one env var. | `mpf init --provider openrouter` writes one enabled required OpenRouter deployment. |
+| UX-001 | First remote setup requires one provider and one env var. | `mpf init --provider nvidia` and `mpf init --provider openrouter` each write one enabled required deployment. |
 | UX-002 | A no-key path validates CLI/project wiring. | `mpf init --preset minimal && mpf doctor --live && mpf demo && mpf init-project && mpf run`. |
 | UX-003 | `doctor` only fails required selected deployments. | Tests cover required vs optional env vars and provider filters. |
 | UX-004 | Live provider calls are opt-in. | Tests cover no-live doctor behavior through the offline flow; docs say live checks are opt-in. |
@@ -48,6 +48,8 @@ mpf run
 | UX-011 | Package artifacts include preset files. | Wheel inspection checks `model_preflight/presets/*.yaml`. |
 
 ## Command behavior
+
+`mpf init --provider nvidia` writes the NVIDIA Build / NIM preset and prints the env var to set.
 
 `mpf init --provider openrouter` writes the OpenRouter preset and prints the env var to set.
 

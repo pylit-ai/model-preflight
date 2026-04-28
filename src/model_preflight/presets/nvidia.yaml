@@ -1,0 +1,22 @@
+version: "1"
+router:
+  num_retries: 1
+  timeout_seconds: 60
+  default_group: free_reasoning
+  audit_jsonl: null
+artifacts_dir: ~/.cache/model-preflight/artifacts
+
+deployments:
+  # Confirm the current NVIDIA Build model slug on the model page before publishable evals.
+  # LiteLLM uses the nvidia_nim/ provider prefix for NVIDIA NIM endpoints.
+  - name: nvidia_nim_nemotron_3_super
+    provider: nvidia
+    group: free_reasoning
+    model: nvidia_nim/nvidia/nemotron-3-super-120b-a12b
+    api_key_env: NVIDIA_NIM_API_KEY
+    enabled: true
+    required: true
+    status: best_effort
+    setup_url: https://build.nvidia.com/settings/api-keys
+    rpm: 10
+    tier: reasoning

@@ -7,10 +7,10 @@ router:
 artifacts_dir: ~/.cache/model-preflight/artifacts
 
 deployments:
-  - name: openrouter_gpt_oss_120b_free
+  - name: openrouter_nemotron_3_super_free
     provider: openrouter
     group: free_reasoning
-    model: openrouter/openai/gpt-oss-120b:free
+    model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
     api_key_env: OPENROUTER_API_KEY
     enabled: true
     required: true

@@ -1,5 +1,24 @@
 # Troubleshooting
 
+## Missing `NVIDIA_NIM_API_KEY`
+
+Symptom:
+
+```text
+missing required env vars: NVIDIA_NIM_API_KEY
+```
+
+Fix:
+
+```bash
+export NVIDIA_NIM_API_KEY=...
+mpf doctor --provider nvidia --live
+```
+
+If the live check fails with a model-not-found style error, open the NVIDIA Build model page,
+confirm the current API sample/model slug, and update `model:` in your local
+`~/.config/model-preflight/config.yaml`.
+
 ## Missing `OPENROUTER_API_KEY`
 
 Symptom:

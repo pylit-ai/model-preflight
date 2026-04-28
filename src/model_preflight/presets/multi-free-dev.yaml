@@ -7,10 +7,23 @@ router:
 artifacts_dir: ~/.cache/model-preflight/artifacts
 
 deployments:
-  - name: openrouter_gpt_oss_120b_free
+  # Confirm the current NVIDIA Build model slug on the model page before publishable evals.
+  - name: nvidia_nim_nemotron_3_super
+    provider: nvidia
+    group: free_reasoning
+    model: nvidia_nim/nvidia/nemotron-3-super-120b-a12b
+    api_key_env: NVIDIA_NIM_API_KEY
+    enabled: false
+    required: false
+    status: optional
+    setup_url: https://build.nvidia.com/settings/api-keys
+    rpm: 10
+    tier: reasoning
+
+  - name: openrouter_nemotron_3_super_free
     provider: openrouter
     group: free_reasoning
-    model: openrouter/openai/gpt-oss-120b:free
+    model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
     api_key_env: OPENROUTER_API_KEY
     enabled: true
     required: true

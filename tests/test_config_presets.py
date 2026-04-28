@@ -9,9 +9,36 @@ from model_preflight.preset_registry import available_presets, preset_text
 
 
 def test_all_packaged_presets_parse():
-    assert {"minimal", "openrouter", "multi-free-dev"}.issubset(set(available_presets()))
+    assert {"minimal", "nvidia", "openrouter", "multi-free-dev"}.issubset(
+        set(available_presets())
+    )
     for preset in available_presets():
         AppConfig.model_validate(yaml.safe_load(preset_text(preset)))
+
+
+def test_provider_init_writes_one_required_nvidia_deployment(tmp_path):
+    cfg_path = tmp_path / "mpf.yaml"
+    write_default_config(cfg_path, provider="nvidia")
+
+    cfg = load_config(cfg_path)
+
+    enabled = [dep for dep in cfg.deployments if dep.enabled]
+    assert len(enabled) == 1
+    assert enabled[0].provider == "nvidia"
+    assert enabled[0].required
+    assert enabled[0].api_key_env == "NVIDIA_NIM_API_KEY"
+    assert enabled[0].model == "nvidia_nim/nvidia/nemotron-3-super-120b-a12b"
+
+
+def test_default_init_uses_nvidia_primary_preset(tmp_path):
+    cfg_path = tmp_path / "mpf.yaml"
+    write_default_config(cfg_path)
+
+    cfg = load_config(cfg_path)
+
+    enabled = [dep for dep in cfg.deployments if dep.enabled]
+    assert len(enabled) == 1
+    assert enabled[0].provider == "nvidia"
 
 
 def test_provider_init_writes_one_required_openrouter_deployment(tmp_path):
@@ -25,6 +52,7 @@ def test_provider_init_writes_one_required_openrouter_deployment(tmp_path):
     assert enabled[0].provider == "openrouter"
     assert enabled[0].required
     assert enabled[0].api_key_env == "OPENROUTER_API_KEY"
+    assert enabled[0].model == "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
 
 
 def test_minimal_preset_has_no_missing_required_env(tmp_path):

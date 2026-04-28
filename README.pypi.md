@@ -10,6 +10,8 @@ A tiny local gateway for LLM smoke tests, provider failover, and cheap prototype
 ![License](https://img.shields.io/badge/license-Apache--2.0-lightgrey.svg)
 ![LiteLLM](https://img.shields.io/badge/router-LiteLLM-informational)
 
+<img src="https://raw.githubusercontent.com/pylit-ai/model-preflight/main/docs/assets/hero.png" alt="ModelPreflight hero image" width="900">
+
 | If you want to... | Start here |
 |-------------------|------------|
 | Get one green check quickly | [60-second start](#60-second-start) |
@@ -35,11 +37,17 @@ pipx install model-preflight
 Pick one provider, set one key, and run one live check:
 
 ```bash
-mpf init --provider openrouter
-export OPENROUTER_API_KEY=...
+mpf init --provider nvidia
+export NVIDIA_NIM_API_KEY=...
 mpf doctor --live
 mpf demo
 ```
+
+Expected signal:
+
+- `mpf init --provider nvidia` writes your machine-local config and prints `next: mpf doctor --live`.
+- `mpf doctor --live` prints a deployments table, then `live check ok: group=...`.
+- `mpf demo` prints JSON with `"passed": true` and an empty `"failures": []` list.
 
 Add checks to a project:
 
@@ -48,6 +56,12 @@ cd my-project
 mpf init-project
 mpf run
 ```
+
+Expected signal:
+
+- `mpf init-project` writes `evals/smoke.jsonl`, writes `.model-preflight/README.md`, and updates `.gitignore`.
+- `mpf run` prints JSON results for the starter cases. Every passing case has `"passed": true`.
+- A failing case exits non-zero and includes strings under `"failures"` so you know what drifted.
 
 Both `mpf` and `model-preflight` are installed as console scripts.
 
@@ -65,6 +79,15 @@ mpf init-project
 mpf run
 ```
 
+What this proves:
+
+- Config loading works without secrets.
+- The CLI can run a live-style check through the offline echo provider.
+- Project bootstrap works by creating `evals/smoke.jsonl`.
+- Smoke scoring works when `mpf run` returns JSON where every case has `"passed": true`.
+
+What it does not prove: remote provider auth, quota, latency, or model quality. Use the OpenRouter path below for that.
+
 ## Machine-local config
 
 ModelPreflight reads provider routes from `~/.config/model-preflight/config.yaml` by default. Override the path with either `--config` or `MODEL_PREFLIGHT_CONFIG`.
@@ -74,6 +97,40 @@ mpf init --provider openrouter
 mpf doctor
 mpf models
 ```
+
+Provider setup is discoverable from the CLI:
+
+```bash
+mpf providers list
+mpf providers guide nvidia
+mpf providers guide openrouter
+mpf providers test nvidia
+mpf providers test openrouter
+```
+
+NVIDIA Build / NIM is the primary high-capability open/open-weight endpoint option. OpenRouter is still the lowest-friction discovery option because one API key can route to many model providers through an OpenAI-compatible API.
+
+Use either primary path:
+
+```bash
+mpf init --provider nvidia
+export NVIDIA_NIM_API_KEY=...
+mpf doctor --provider nvidia --live
+
+mpf init --provider openrouter
+export OPENROUTER_API_KEY=...
+mpf doctor --provider openrouter --live
+```
+
+| Provider | Best for | Env var | Setup |
+|----------|----------|---------|-------|
+| NVIDIA Build / NIM | Primary high-capability open/open-weight endpoint pool | `NVIDIA_NIM_API_KEY` | [API keys](https://build.nvidia.com/settings/api-keys) |
+| OpenRouter | One-key first run with broad model access | `OPENROUTER_API_KEY` | [Authentication docs](https://openrouter.ai/docs/api-reference/authentication) |
+| Groq | Fast repeated calls after first-run setup works | `GROQ_API_KEY` | [Groq console](https://console.groq.com/keys) |
+| Cerebras | Fast inference experiments when current dev-tier limits fit | `CEREBRAS_API_KEY` | [Cerebras inference docs](https://inference-docs.cerebras.ai/) |
+| Mistral | First-party Mistral model-family smoke checks | `MISTRAL_API_KEY` | [Mistral API keys](https://docs.mistral.ai/getting-started/quickstart/#account-setup) |
+
+Secondary/overflow pool to add manually once the primary pool works: Google Gemini/Gemma, Cloudflare Workers AI, GitHub Models, Hugging Face Inference Providers, and SambaNova. These are documented in `docs/PROVIDER_PRESETS.md`, but not packaged as first-run presets yet because auth shape, model IDs, and free/dev limits are more account-specific.
 
 The default config creates logical groups, then maps each group to one or more LiteLLM deployments:
 
@@ -86,16 +143,16 @@ router:
 artifacts_dir: ~/.cache/model-preflight/artifacts
 
 deployments:
-  - name: openrouter_gpt_oss_120b_free
-    provider: openrouter
+  - name: nvidia_nim_nemotron_3_super
+    provider: nvidia
     group: free_reasoning
-    model: openrouter/openai/gpt-oss-120b:free
-    api_key_env: OPENROUTER_API_KEY
+    model: nvidia_nim/nvidia/nemotron-3-super-120b-a12b
+    api_key_env: NVIDIA_NIM_API_KEY
     enabled: true
     required: true
     status: best_effort
-    setup_url: https://openrouter.ai/docs/api-reference/authentication
-    rpm: 18
+    setup_url: https://build.nvidia.com/settings/api-keys
+    rpm: 10
     tier: reasoning
 ```
 
