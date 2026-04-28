@@ -186,7 +186,7 @@ ModelPreflight requires Python 3.11+.
 
 ## Machine-local config
 
-ModelPreflight reads provider routes from your OS-specific user config directory by default.
+ModelPreflight reads provider routes and secret-source references from your OS-specific user config directory by default.
 Use `mpf paths` to print the exact path. Override the path with either `--config` or
 `MODEL_PREFLIGHT_CONFIG`.
 
@@ -201,6 +201,16 @@ With no `--provider` or `--preset`, `mpf init` checks visible environment variab
 `OPENROUTER_API_KEY`, `NVIDIA_NIM_API_KEY`, `GROQ_API_KEY`, `CEREBRAS_API_KEY`,
 `MISTRAL_API_KEY`. OpenRouter is only the fallback starter when none of those keys are visible.
 Explicit `--provider` and `--preset` always override auto-detection.
+
+Provider keys are not stored in the config. For local cross-project use, link a machine-local
+dotenv file that stays outside this public package:
+
+```bash
+mpf setup --env-file /path/to/private/.env
+```
+
+Process env vars still win over linked dotenv values, which keeps CI and production behavior
+compatible with standard secret injection.
 
 Provider setup is discoverable from the CLI:
 
@@ -219,9 +229,8 @@ through an OpenAI-compatible API.
 Use either primary path:
 
 ```bash
-mpf init --provider nvidia
-export NVIDIA_NIM_API_KEY=...
-mpf doctor --provider nvidia --live
+mpf setup --env-file /path/to/private/.env
+mpf doctor --group free_reasoning --live
 
 mpf init --provider openrouter
 export OPENROUTER_API_KEY=...
@@ -229,7 +238,7 @@ mpf doctor --provider openrouter --live
 ```
 
 For agent and CI readiness checks, make sure provider keys are visible in the agent process
-environment, then use JSON diagnostics:
+environment or through a linked machine-local secret source, then use JSON diagnostics:
 
 ```bash
 mpf doctor --group free_reasoning --json
@@ -305,8 +314,8 @@ mpf models
 Use environment variables for secrets. Do not commit provider keys.
 
 If you use 1Password, see [`docs/secrets/1password.md`](docs/secrets/1password.md)
-for `op run` examples and an optional vault helper. The 1Password helper manages env vars;
-run `mpf init --provider <provider>` once to create the machine-local provider config.
+for linked dotenv and `op run` examples. Run `mpf init --provider <provider>` once to create
+the machine-local provider config.
 
 </details>
 
@@ -462,7 +471,7 @@ Package metadata lives in [`pyproject.toml`](./pyproject.toml). Tests live under
 
 ## Design principles
 
-- Global provider/auth/routing lives in `~/.config/model-preflight/config.yaml`.
+- Global provider routing lives in the path printed by `mpf paths`.
 - Project-local checks define cases, scoring, fixtures, and artifacts.
 - LiteLLM handles provider-specific API quirks.
 - ModelPreflight adds stable aliases, lightweight failover, and audit logs.

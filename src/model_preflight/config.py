@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
+from dotenv import dotenv_values
 from platformdirs import user_cache_path, user_config_path
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -50,11 +51,31 @@ class RouterSettings(BaseModel):
     audit_jsonl: Path | None = None
 
 
+class SecretSource(BaseModel):
+    kind: Literal["env", "dotenv"] = "env"
+    path: Path | None = None
+
+
+class SecretsSettings(BaseModel):
+    sources: list[SecretSource] = Field(default_factory=lambda: [SecretSource(kind="env")])
+
+    @field_validator("sources")
+    @classmethod
+    def at_least_env(cls, value: list[SecretSource]) -> list[SecretSource]:
+        if not value:
+            return [SecretSource(kind="env")]
+        if not any(source.kind == "env" for source in value):
+            return [SecretSource(kind="env"), *value]
+        return value
+
+
 class AppConfig(BaseModel):
     version: str = "1"
     router: RouterSettings = Field(default_factory=RouterSettings)
+    secrets: SecretsSettings = Field(default_factory=SecretsSettings)
     deployments: list[Deployment] = Field(default_factory=list)
     artifacts_dir: Path = Field(default_factory=lambda: user_cache_path(APP_NAME) / "artifacts")
+    config_path: Path | None = Field(default=None, exclude=True)
 
     @field_validator("deployments")
     @classmethod
@@ -83,9 +104,47 @@ def load_config(path: Path | str | None = None) -> AppConfig:
     with cfg_path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     cfg = AppConfig.model_validate(data)
+    cfg.config_path = cfg_path
     if cfg.router.audit_jsonl is None:
         cfg.router.audit_jsonl = cfg.artifacts_dir / "audit.jsonl"
     return cfg
+
+
+def _dotenv_values(path: Path) -> dict[str, str | None]:
+    if not path.exists() or not path.is_file():
+        return {}
+    return dict(dotenv_values(path))
+
+
+def resolve_secret(config: AppConfig, env_var: str) -> str | None:
+    env_value = os.getenv(env_var)
+    if env_value:
+        return env_value
+    for source in config.secrets.sources:
+        if source.kind != "dotenv" or source.path is None:
+            continue
+        value = _dotenv_values(source.path.expanduser()).get(env_var)
+        if value:
+            return value
+    return None
+
+
+def secret_source_status(config: AppConfig) -> list[dict[str, object]]:
+    statuses: list[dict[str, object]] = []
+    for source in config.secrets.sources:
+        if source.kind == "env":
+            statuses.append({"kind": "env"})
+            continue
+        path = source.path.expanduser() if source.path is not None else None
+        statuses.append(
+            {
+                "kind": "dotenv",
+                "path": str(path) if path is not None else None,
+                "exists": bool(path and path.exists()),
+                "readable": bool(path and path.is_file() and os.access(path, os.R_OK)),
+            }
+        )
+    return statuses
 
 
 def detect_provider_from_env() -> str | None:
@@ -97,17 +156,29 @@ def detect_provider_from_env() -> str | None:
     return None
 
 
-def _preset_data_for_write(preset_name: str, *, provider: str | None = None) -> dict:
+def _preset_data_for_write(
+    preset_name: str,
+    *,
+    provider: str | None = None,
+    fallback_provider: str | None = None,
+) -> dict:
     data = yaml.safe_load(preset_text(preset_name)) or {}
     if provider is None:
         return data
 
-    matching = [dep for dep in data.get("deployments", []) if dep.get("provider") == provider]
+    selected_providers = [provider]
+    if fallback_provider is not None and fallback_provider != provider:
+        selected_providers.append(fallback_provider)
+    matching = [
+        dep
+        for dep in data.get("deployments", [])
+        if dep.get("provider") in selected_providers
+    ]
     if not matching:
         return data
 
     for dep in data.get("deployments", []):
-        is_selected = dep.get("provider") == provider
+        is_selected = dep.get("provider") in selected_providers
         dep["enabled"] = is_selected
         dep["required"] = is_selected
         if is_selected:
@@ -127,6 +198,7 @@ def write_default_config(
     overwrite: bool = False,
     preset: str | None = None,
     provider: str | None = None,
+    fallback_provider: str | None = None,
 ) -> Path:
     out = Path(path).expanduser() if path is not None else default_config_path()
     if out.exists() and not overwrite:
@@ -134,10 +206,21 @@ def write_default_config(
     selected_provider = provider
     if selected_provider is None and preset is None:
         selected_provider = detect_provider_from_env()
-    preset_name = (
-        preset_for_provider(selected_provider) if selected_provider else (preset or DEFAULT_PRESET)
+    if fallback_provider is not None:
+        preset_for_provider(fallback_provider)
+    if fallback_provider and selected_provider:
+        preset_name = "multi-free-dev"
+    else:
+        preset_name = (
+            preset_for_provider(selected_provider)
+            if selected_provider
+            else (preset or DEFAULT_PRESET)
+        )
+    data = _preset_data_for_write(
+        preset_name,
+        provider=selected_provider,
+        fallback_provider=fallback_provider,
     )
-    data = _preset_data_for_write(preset_name, provider=selected_provider)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     return out
@@ -176,6 +259,36 @@ def missing_env_vars(
     for dep in selected_deployments(config, group=group, provider=provider):
         if required_only and not dep.required:
             continue
-        if dep.api_key_env and not os.getenv(dep.api_key_env):
+        if dep.api_key_env and not resolve_secret(config, dep.api_key_env):
             missing.append(dep.api_key_env)
     return sorted(set(missing))
+
+
+def deployment_is_ready(config: AppConfig, deployment: Deployment) -> bool:
+    return not deployment.api_key_env or bool(resolve_secret(config, deployment.api_key_env))
+
+
+def link_dotenv_secret_source(config: AppConfig, path: Path | str) -> AppConfig:
+    linked = Path(path).expanduser()
+    sources = [source for source in config.secrets.sources if source.kind == "env"]
+    sources.extend(
+        source
+        for source in config.secrets.sources
+        if not (source.kind == "env" or (source.kind == "dotenv" and source.path == linked))
+    )
+    sources.append(SecretSource(kind="dotenv", path=linked))
+    config.secrets = SecretsSettings(sources=sources)
+    return config
+
+
+def write_config(config: AppConfig, path: Path | str | None = None) -> Path:
+    out = (
+        Path(path).expanduser()
+        if path is not None
+        else config.config_path or default_config_path()
+    )
+    data = config.model_dump(mode="json", exclude={"config_path"}, exclude_none=True)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    config.config_path = out
+    return out

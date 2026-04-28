@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import json
-import os
 import time
 from pathlib import Path
 from typing import Any
 
-from .config import AppConfig, Deployment
+from .config import AppConfig, Deployment, resolve_secret
 
 
-def _deployment_to_litellm(dep: Deployment) -> dict[str, Any]:
+def _deployment_to_litellm(dep: Deployment, config: AppConfig) -> dict[str, Any]:
     params: dict[str, Any] = {"model": dep.model}
     if dep.api_key_env:
-        api_key = os.getenv(dep.api_key_env)
+        api_key = resolve_secret(config, dep.api_key_env)
         if api_key:
             params["api_key"] = api_key
     if dep.api_base:
@@ -41,7 +40,7 @@ class ModelGateway:
         if any(d.provider != "offline" for d in self.enabled_deployments):
             from litellm import Router
 
-            model_list = [_deployment_to_litellm(d) for d in self.enabled_deployments]
+            model_list = [_deployment_to_litellm(d, config) for d in self.enabled_deployments]
             self.router = Router(
                 model_list=model_list,
                 num_retries=config.router.num_retries,

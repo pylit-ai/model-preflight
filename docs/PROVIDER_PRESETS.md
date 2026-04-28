@@ -15,6 +15,8 @@ Rules:
 - `mpf init --preset minimal` is the no-key offline preset for CLI/demo validation.
 - `mpf doctor` should fail fast only when required keys for the selected group/provider are missing.
 - `mpf doctor --json` is the stable readiness contract for agents and CI.
+- `mpf secrets link /path/to/private/.env` may add machine-local dotenv secret sources, but raw
+  provider keys must not be written into publishable configs or docs.
 - Optional or disabled providers should be reported as skipped/warnings, not first-run failures.
 - Live provider checks should be opt-in in CI.
 - Any free/dev endpoint may disappear, rate-limit, or change model behavior.

@@ -14,10 +14,14 @@ from .config import (
     AppConfig,
     Deployment,
     default_config_path,
+    deployment_is_ready,
     detect_provider_from_env,
+    link_dotenv_secret_source,
     load_config,
     missing_env_vars,
+    secret_source_status,
     selected_deployments,
+    write_config,
     write_default_config,
 )
 from .preset_registry import PROVIDERS, available_presets
@@ -27,7 +31,9 @@ from .smoke import SmokeCase, run_smoke_cases
 
 app = typer.Typer(no_args_is_help=True, help="Preflight checks for LLM prototypes.")
 providers_app = typer.Typer(no_args_is_help=True, help="Provider setup helpers.")
+secrets_app = typer.Typer(no_args_is_help=True, help="Machine-local secret source helpers.")
 app.add_typer(providers_app, name="providers")
+app.add_typer(secrets_app, name="secrets")
 console = Console()
 
 
@@ -58,7 +64,7 @@ def _deployment_table(
     ]:
         table.add_column(col)
     for dep in selected_deployments(cfg, group=group, provider=provider, include_disabled=True):
-        env_status = _env_status(dep)
+        env_status = _env_status(cfg, dep)
         table.add_row(
             str(dep.enabled),
             str(dep.required),
@@ -74,13 +80,15 @@ def _deployment_table(
     return table
 
 
-def _env_status(dep: Deployment) -> str:
+def _env_status(cfg: AppConfig, dep: Deployment) -> str:
     if not dep.api_key_env:
         return "not-needed"
-    if os.getenv(dep.api_key_env):
-        return "ok"
     if not dep.enabled:
         return "disabled"
+    if deployment_is_ready(cfg, dep):
+        return "ok"
+    if os.getenv(dep.api_key_env):
+        return "ok"
     return "missing" if dep.required else "optional-missing"
 
 
@@ -119,9 +127,12 @@ def _doctor_diagnostic(
     selected = selected_deployments(cfg, group=group, provider=provider)
     selected_group = group or (selected[0].group if selected else cfg.router.default_group)
     disabled_matching = _disabled_matching_deployments(cfg, group=group, provider=provider)
-    missing = missing_env_vars(cfg, group=group, provider=provider, required_only=True)
     required_env = _required_env_vars(selected)
+    ready = [dep for dep in selected if deployment_is_ready(cfg, dep)]
+    blocked = [dep for dep in selected if not deployment_is_ready(cfg, dep)]
+    missing = missing_env_vars(cfg, group=group, provider=provider, required_only=True)
     next_commands: list[str] = []
+    warnings: list[str] = []
     error_code: str | None = None
 
     if not selected:
@@ -131,6 +142,18 @@ def _doctor_diagnostic(
         else:
             error_code = "GROUP_NOT_FOUND"
             next_commands.append("mpf models")
+    elif not ready:
+        if len(selected) == 1 and missing:
+            error_code = "MISSING_REQUIRED_ENV"
+            next_commands.extend(f"export {env_var}=..." for env_var in missing)
+        else:
+            error_code = "NO_READY_DEPLOYMENT"
+            next_commands.extend(f"export {env_var}=..." for env_var in missing)
+            next_commands.append("model-preflight secrets link /path/to/private/.env")
+    elif blocked:
+        warnings.append(
+            "At least one deployment is ready, but some enabled deployments are missing secrets."
+        )
     elif missing:
         error_code = "MISSING_REQUIRED_ENV"
         next_commands.extend(f"export {env_var}=..." for env_var in missing)
@@ -138,11 +161,14 @@ def _doctor_diagnostic(
     return {
         "status": "error" if error_code else "ok",
         "error_code": error_code,
+        "config_path": str(cfg.config_path) if cfg.config_path is not None else None,
         "selected_group": selected_group,
         "selected_provider": provider or (selected[0].provider if selected else None),
         "enabled_groups": _enabled_groups(cfg),
         "required_env_vars": required_env,
         "missing_env_vars": missing if selected else [],
+        "ready_deployments": [dep.name for dep in ready],
+        "blocked_deployments": [dep.name for dep in blocked],
         "disabled_matching_providers": sorted(
             {
                 dep.provider
@@ -150,6 +176,8 @@ def _doctor_diagnostic(
                 if dep.provider is not None
             }
         ),
+        "secret_sources": secret_source_status(cfg),
+        "warnings": warnings,
         "next_commands": next_commands,
     }
 
@@ -176,13 +204,24 @@ def init(
     path: Annotated[Path | None, typer.Option("--config")] = None,
     overwrite: Annotated[bool, typer.Option("--overwrite")] = False,
     provider: Annotated[str | None, typer.Option("--provider")] = None,
+    fallback: Annotated[str | None, typer.Option("--fallback")] = None,
     preset: Annotated[str | None, typer.Option("--preset")] = None,
 ) -> None:
     """Create the machine-local ModelPreflight config."""
     if provider and preset:
         raise typer.BadParameter("use either --provider or --preset, not both")
+    if fallback and not provider:
+        raise typer.BadParameter("--fallback requires --provider")
+    if fallback and preset:
+        raise typer.BadParameter("use --fallback only with --provider")
     detected_provider = None if provider or preset else detect_provider_from_env()
-    out = write_default_config(path, overwrite=overwrite, preset=preset, provider=provider)
+    out = write_default_config(
+        path,
+        overwrite=overwrite,
+        preset=preset,
+        provider=provider,
+        fallback_provider=fallback,
+    )
     console.print(f"wrote config: {out}")
     if provider:
         info = PROVIDERS.get(provider)
@@ -190,6 +229,10 @@ def init(
             env_vars = ", ".join(info.env_vars)
             console.print(f"provider: {info.name}")
             console.print(f"set env var: {env_vars}")
+        if fallback:
+            fallback_info = PROVIDERS.get(fallback)
+            if fallback_info:
+                console.print(f"fallback: {fallback_info.name}")
     elif detected_provider:
         info = PROVIDERS[detected_provider]
         console.print(f"provider: {info.name} (auto-detected from {info.env_vars[0]})")
@@ -197,6 +240,51 @@ def init(
         console.print("no supported provider key visible; wrote OpenRouter starter config")
         console.print("next: export OPENROUTER_API_KEY=...")
     console.print("next: mpf doctor --live")
+
+
+@app.command()
+def setup(
+    path: Annotated[Path | None, typer.Option("--config")] = None,
+    provider: Annotated[str, typer.Option("--provider")] = "nvidia",
+    fallback: Annotated[str | None, typer.Option("--fallback")] = "openrouter",
+    env_file: Annotated[Path | None, typer.Option("--env-file", dir_okay=False)] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Set up local routing, optional fallback, and a private dotenv source."""
+    out = write_default_config(
+        path,
+        overwrite=True,
+        provider=provider,
+        fallback_provider=fallback,
+    )
+    cfg = load_config(out)
+    linked_env_file = env_file or (Path.cwd() / ".env" if (Path.cwd() / ".env").exists() else None)
+    if linked_env_file is not None:
+        link_dotenv_secret_source(cfg, linked_env_file)
+        write_config(cfg, out)
+        cfg = load_config(out)
+    diagnostic = _doctor_diagnostic(cfg, group=cfg.router.default_group)
+    if json_output:
+        typer.echo(json.dumps(diagnostic, indent=2))
+        if diagnostic["status"] != "ok":
+            raise typer.Exit(code=2)
+        return
+    console.print(f"updated config: {out}")
+    console.print(f"provider: {PROVIDERS[provider].name}")
+    if fallback:
+        console.print(f"fallback: {PROVIDERS[fallback].name}")
+    if linked_env_file is not None:
+        console.print(f"linked dotenv secret source: {linked_env_file.expanduser()}")
+    else:
+        console.print("no dotenv file linked")
+        console.print("next: mpf secrets link /path/to/private/.env")
+    ready = cast(list[str], diagnostic["ready_deployments"])
+    blocked = cast(list[str], diagnostic["blocked_deployments"])
+    console.print(f"ready deployments: {', '.join(ready) or 'none'}")
+    console.print(f"blocked deployments: {', '.join(blocked) or 'none'}")
+    console.print("next: mpf doctor --group free_reasoning --json")
+    if diagnostic["status"] != "ok":
+        raise typer.Exit(code=2)
 
 
 @app.command()
@@ -247,17 +335,72 @@ def doctor(
             console.print(f"next: {command}")
         raise typer.Exit(code=2)
     missing = missing_env_vars(cfg, group=group, provider=provider, required_only=True)
-    if missing:
+    if diagnostic["status"] != "ok" and missing:
         console.print(f"missing required env vars: {', '.join(missing)}")
         for command in cast(list[str], diagnostic["next_commands"]):
             console.print(f"next: {command}")
         raise typer.Exit(code=2)
+    if diagnostic["status"] != "ok":
+        console.print(str(diagnostic["error_code"]))
+        for command in cast(list[str], diagnostic["next_commands"]):
+            console.print(f"next: {command}")
+        raise typer.Exit(code=2)
+    warnings = cast(list[str], diagnostic["warnings"])
+    for warning in warnings:
+        console.print(f"warning: {warning}")
     optional_missing = missing_env_vars(cfg, group=group, provider=provider, required_only=False)
     optional_missing = [env for env in optional_missing if env not in missing]
     if optional_missing:
         console.print(f"optional env vars not set: {', '.join(optional_missing)}")
     if live:
         _doctor_live(cfg, group=group, provider=provider)
+
+
+@secrets_app.command("link")
+def secrets_link(
+    env_file: Annotated[Path, typer.Argument(exists=False, dir_okay=False)],
+    path: Annotated[Path | None, typer.Option("--config")] = None,
+) -> None:
+    """Link a machine-local dotenv file as a secret source."""
+    cfg = load_config(path)
+    link_dotenv_secret_source(cfg, env_file)
+    out = write_config(cfg, path)
+    console.print(f"linked dotenv secret source: {env_file.expanduser()}")
+    console.print(f"updated config: {out}")
+    console.print("next: model-preflight secrets doctor")
+
+
+@secrets_app.command("doctor")
+def secrets_doctor(
+    path: Annotated[Path | None, typer.Option("--config")] = None,
+    group: Annotated[str | None, typer.Option("--group")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Report secret source readiness without printing secret values."""
+    cfg = load_config(path)
+    diagnostic = _doctor_diagnostic(cfg, group=group)
+    if json_output:
+        typer.echo(json.dumps(diagnostic, indent=2))
+        if diagnostic["status"] != "ok":
+            raise typer.Exit(code=2)
+        return
+    for source in cast(list[dict[str, object]], diagnostic["secret_sources"]):
+        if source["kind"] == "env":
+            console.print("secret source: env")
+        else:
+            console.print(
+                "secret source: dotenv "
+                f"path={source.get('path')} exists={source.get('exists')} "
+                f"readable={source.get('readable')}"
+            )
+    ready = cast(list[str], diagnostic["ready_deployments"])
+    blocked = cast(list[str], diagnostic["blocked_deployments"])
+    console.print(f"ready deployments: {', '.join(ready) or 'none'}")
+    console.print(f"blocked deployments: {', '.join(blocked) or 'none'}")
+    if diagnostic["status"] != "ok":
+        for command in cast(list[str], diagnostic["next_commands"]):
+            console.print(f"next: {command}")
+        raise typer.Exit(code=2)
 
 
 def _doctor_live(cfg: AppConfig, *, group: str | None = None, provider: str | None = None) -> None:

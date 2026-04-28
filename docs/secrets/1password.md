@@ -1,11 +1,12 @@
 # 1Password Secrets
 
-ModelPreflight reads provider credentials from environment variables. 1Password
-is optional; plain shell exports, `.env` loaders, CI secrets, and other secret
-managers work as long as they provide the same env vars.
+ModelPreflight reads provider credentials from process environment variables and
+optional machine-local dotenv secret sources. 1Password is optional; plain shell
+exports, `.env` loaders, CI secrets, and other secret managers work as long as
+they provide the same env vars.
 
-1Password does not replace the ModelPreflight provider config. Create that
-machine-local config separately:
+1Password does not replace the ModelPreflight provider routing config. Create
+that machine-local config separately:
 
 ```bash
 mpf paths
@@ -17,10 +18,20 @@ mpf init --provider nvidia
 
 ## Recommended Local Pattern
 
+Use a private dotenv file for local cross-project runs:
+
+```bash
+mpf setup --env-file /path/to/private/.env
+```
+
+The dotenv file must stay private and uncommitted. ModelPreflight records only
+the path and reads values at runtime. Process environment variables override
+dotenv values.
+
 Use `op run` when you want secrets available only to a subprocess:
 
 ```bash
-op run --env-file=.env.1password -- mpf smoke openrouter/auto --prompt "ping"
+op run --env-file=.env.1password -- mpf doctor --live
 ```
 
 In `.env.1password`, use 1Password secret references:

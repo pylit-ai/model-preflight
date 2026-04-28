@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "model-preflight"
-version = "0.1.7"
+version = "0.1.8"
 description = "Preflight checks for LLM prototypes."
 readme = "README.pypi.md"
 requires-python = ">=3.11"
@@ -16,6 +16,7 @@ dependencies = [
   "pydantic>=2.7,<3",
   "pydantic-settings>=2.4",
   "platformdirs>=4.3",
+  "python-dotenv>=1.2",
   "PyYAML>=6.0",
   "rich>=13.7",
   "typer>=0.16",

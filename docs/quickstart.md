@@ -68,8 +68,14 @@ export NVIDIA_NIM_API_KEY=...
 mpf doctor --provider nvidia --live
 ```
 
-Agent and CI processes must receive the provider key in their own environment. Use JSON output as
-the readiness gate:
+For local cross-project use, keep secrets in a private dotenv file and link it once:
+
+```bash
+mpf setup --env-file /path/to/private/.env
+```
+
+Agent and CI processes must receive the provider key in their own environment or through a linked
+machine-local secret source. Use JSON output as the readiness gate:
 
 ```bash
 mpf doctor --group free_reasoning --json

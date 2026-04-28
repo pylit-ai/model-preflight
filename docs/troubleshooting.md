@@ -18,6 +18,12 @@ For agents and CI, the key must be visible in that process environment. A key se
 desktop session, or secret store does not count until it is injected into the process running
 `mpf`.
 
+For local cross-project use, link the private dotenv file once:
+
+```bash
+mpf setup --env-file /path/to/private/.env
+```
+
 ## Missing `NVIDIA_NIM_API_KEY`
 
 Symptom:
@@ -35,7 +41,7 @@ mpf doctor --provider nvidia --live
 
 If the live check fails with a model-not-found style error, open the NVIDIA Build model page,
 confirm the current API sample/model slug, and update `model:` in your local
-`~/.config/model-preflight/config.yaml`.
+config path shown by `mpf paths`.
 
 ## Missing `OPENROUTER_API_KEY`
 
@@ -63,6 +69,8 @@ mpf doctor --group free_reasoning --json
 Read `error_code`:
 
 - `MISSING_REQUIRED_ENV` means the selected group exists, but the required key is absent.
+- `NO_READY_DEPLOYMENT` means the selected group exists, but none of its enabled deployments have
+  usable credentials.
 - `GROUP_NOT_FOUND` means the requested group is not configured.
 - `GROUP_DISABLED` means a matching provider/group exists only in disabled deployments.
 
@@ -107,7 +115,7 @@ mpf models
 mpf providers guide openrouter
 ```
 
-Then update `~/.config/model-preflight/config.yaml` or regenerate a preset:
+Then update the config path shown by `mpf paths` or regenerate a preset:
 
 ```bash
 mpf init --provider openrouter --overwrite
