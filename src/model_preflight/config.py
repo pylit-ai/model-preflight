@@ -9,11 +9,12 @@ from platformdirs import user_cache_path, user_config_path
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .preset_registry import preset_for_provider, preset_text
+from .preset_registry import PROVIDERS, preset_for_provider, preset_text
 
 APP_NAME = "model-preflight"
 
-DEFAULT_PRESET = "nvidia"
+DEFAULT_PRESET = "openrouter"
+AUTO_PROVIDER_PRIORITY = ("openrouter", "nvidia", "groq", "cerebras", "mistral")
 
 
 class Deployment(BaseModel):
@@ -87,6 +88,39 @@ def load_config(path: Path | str | None = None) -> AppConfig:
     return cfg
 
 
+def detect_provider_from_env() -> str | None:
+    """Return the first supported provider with a visible API key."""
+    for provider_id in AUTO_PROVIDER_PRIORITY:
+        info = PROVIDERS[provider_id]
+        if any(os.getenv(env_var) for env_var in info.env_vars):
+            return provider_id
+    return None
+
+
+def _preset_data_for_write(preset_name: str, *, provider: str | None = None) -> dict:
+    data = yaml.safe_load(preset_text(preset_name)) or {}
+    if provider is None:
+        return data
+
+    matching = [dep for dep in data.get("deployments", []) if dep.get("provider") == provider]
+    if not matching:
+        return data
+
+    for dep in data.get("deployments", []):
+        is_selected = dep.get("provider") == provider
+        dep["enabled"] = is_selected
+        dep["required"] = is_selected
+        if is_selected:
+            dep["status"] = "required"
+
+    router = data.setdefault("router", {})
+    router["default_group"] = matching[0].get(
+        "group",
+        router.get("default_group", "free_reasoning"),
+    )
+    return data
+
+
 def write_default_config(
     path: Path | str | None = None,
     *,
@@ -97,10 +131,15 @@ def write_default_config(
     out = Path(path).expanduser() if path is not None else default_config_path()
     if out.exists() and not overwrite:
         return out
-    preset_name = preset_for_provider(provider) if provider else (preset or DEFAULT_PRESET)
-    text = preset_text(preset_name)
+    selected_provider = provider
+    if selected_provider is None and preset is None:
+        selected_provider = detect_provider_from_env()
+    preset_name = (
+        preset_for_provider(selected_provider) if selected_provider else (preset or DEFAULT_PRESET)
+    )
+    data = _preset_data_for_write(preset_name, provider=selected_provider)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(text, encoding="utf-8")
+    out.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     return out
 
 

@@ -85,18 +85,23 @@ uv tool install model-preflight
 pipx install model-preflight
 ```
 
-Pick one provider, set one key, and run one live check:
+Set one supported provider key, initialize, and run one live check:
 
 ```bash
-mpf init --provider nvidia
-export NVIDIA_NIM_API_KEY=...
+export OPENROUTER_API_KEY=...
+# or: export NVIDIA_NIM_API_KEY=...
+# or: export GROQ_API_KEY=...
+# or: export CEREBRAS_API_KEY=...
+# or: export MISTRAL_API_KEY=...
+mpf init
 mpf doctor --live
 mpf demo
 ```
 
 Expected signal:
 
-- `mpf init --provider nvidia` writes your machine-local config and prints `next: mpf doctor --live`.
+- `mpf init` writes your machine-local config for the first visible provider key. If no supported
+  key is visible, it writes the OpenRouter starter config and tells you to export `OPENROUTER_API_KEY`.
 - `mpf doctor --live` prints a deployments table, then `live check ok: group=...`.
 - `mpf demo` prints JSON with `"passed": true` and an empty `"failures": []` list.
 
@@ -187,10 +192,15 @@ Use `mpf paths` to print the exact path. Override the path with either `--config
 
 ```bash
 mpf paths
-mpf init --provider openrouter
+mpf init
 mpf doctor
 mpf models
 ```
+
+With no `--provider` or `--preset`, `mpf init` checks visible environment variables in this order:
+`OPENROUTER_API_KEY`, `NVIDIA_NIM_API_KEY`, `GROQ_API_KEY`, `CEREBRAS_API_KEY`,
+`MISTRAL_API_KEY`. OpenRouter is only the fallback starter when none of those keys are visible.
+Explicit `--provider` and `--preset` always override auto-detection.
 
 Provider setup is discoverable from the CLI:
 
@@ -217,6 +227,16 @@ mpf init --provider openrouter
 export OPENROUTER_API_KEY=...
 mpf doctor --provider openrouter --live
 ```
+
+For agent and CI readiness checks, make sure provider keys are visible in the agent process
+environment, then use JSON diagnostics:
+
+```bash
+mpf doctor --group free_reasoning --json
+```
+
+`status: "ok"` means config and required keys are present. `error_code` distinguishes
+`MISSING_REQUIRED_ENV`, `GROUP_NOT_FOUND`, and disabled matching provider/group cases.
 
 | Provider | Best for | Env var | Setup |
 |----------|----------|---------|-------|

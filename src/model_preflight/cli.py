@@ -4,7 +4,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
 from rich.console import Console
@@ -14,6 +14,7 @@ from .config import (
     AppConfig,
     Deployment,
     default_config_path,
+    detect_provider_from_env,
     load_config,
     missing_env_vars,
     selected_deployments,
@@ -83,6 +84,76 @@ def _env_status(dep: Deployment) -> str:
     return "missing" if dep.required else "optional-missing"
 
 
+def _enabled_groups(cfg: AppConfig) -> list[str]:
+    return sorted({dep.group for dep in cfg.deployments if dep.enabled})
+
+
+def _required_env_vars(deployments: list[Deployment]) -> list[str]:
+    return sorted({dep.api_key_env for dep in deployments if dep.required and dep.api_key_env})
+
+
+def _disabled_matching_deployments(
+    cfg: AppConfig,
+    *,
+    group: str | None = None,
+    provider: str | None = None,
+) -> list[Deployment]:
+    return [
+        dep
+        for dep in selected_deployments(
+            cfg,
+            group=group,
+            provider=provider,
+            include_disabled=True,
+        )
+        if not dep.enabled
+    ]
+
+
+def _doctor_diagnostic(
+    cfg: AppConfig,
+    *,
+    group: str | None = None,
+    provider: str | None = None,
+) -> dict[str, object]:
+    selected = selected_deployments(cfg, group=group, provider=provider)
+    selected_group = group or (selected[0].group if selected else cfg.router.default_group)
+    disabled_matching = _disabled_matching_deployments(cfg, group=group, provider=provider)
+    missing = missing_env_vars(cfg, group=group, provider=provider, required_only=True)
+    required_env = _required_env_vars(selected)
+    next_commands: list[str] = []
+    error_code: str | None = None
+
+    if not selected:
+        if disabled_matching:
+            error_code = "GROUP_DISABLED"
+            next_commands.append("enable a matching deployment in the ModelPreflight config")
+        else:
+            error_code = "GROUP_NOT_FOUND"
+            next_commands.append("mpf models")
+    elif missing:
+        error_code = "MISSING_REQUIRED_ENV"
+        next_commands.extend(f"export {env_var}=..." for env_var in missing)
+
+    return {
+        "status": "error" if error_code else "ok",
+        "error_code": error_code,
+        "selected_group": selected_group,
+        "selected_provider": provider or (selected[0].provider if selected else None),
+        "enabled_groups": _enabled_groups(cfg),
+        "required_env_vars": required_env,
+        "missing_env_vars": missing if selected else [],
+        "disabled_matching_providers": sorted(
+            {
+                dep.provider
+                for dep in disabled_matching
+                if dep.provider is not None
+            }
+        ),
+        "next_commands": next_commands,
+    }
+
+
 def _parse_cases(path: Path) -> list[SmokeCase]:
     raw = [
         json.loads(line)
@@ -110,6 +181,7 @@ def init(
     """Create the machine-local ModelPreflight config."""
     if provider and preset:
         raise typer.BadParameter("use either --provider or --preset, not both")
+    detected_provider = None if provider or preset else detect_provider_from_env()
     out = write_default_config(path, overwrite=overwrite, preset=preset, provider=provider)
     console.print(f"wrote config: {out}")
     if provider:
@@ -118,6 +190,12 @@ def init(
             env_vars = ", ".join(info.env_vars)
             console.print(f"provider: {info.name}")
             console.print(f"set env var: {env_vars}")
+    elif detected_provider:
+        info = PROVIDERS[detected_provider]
+        console.print(f"provider: {info.name} (auto-detected from {info.env_vars[0]})")
+    elif preset is None:
+        console.print("no supported provider key visible; wrote OpenRouter starter config")
+        console.print("next: export OPENROUTER_API_KEY=...")
     console.print("next: mpf doctor --live")
 
 
@@ -135,19 +213,44 @@ def doctor(
     group: Annotated[str | None, typer.Option("--group")] = None,
     provider: Annotated[str | None, typer.Option("--provider")] = None,
     live: Annotated[bool, typer.Option("--live")] = False,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Validate config/env and optionally run a tiny live provider check."""
     cfg = load_config(path)
+    diagnostic = _doctor_diagnostic(cfg, group=group, provider=provider)
+    if json_output:
+        typer.echo(json.dumps(diagnostic, indent=2))
+        if diagnostic["status"] != "ok":
+            raise typer.Exit(code=2)
+        if live:
+            _doctor_live(cfg, group=group, provider=provider)
+        return
+
     console.print(_deployment_table(cfg, group=group, provider=provider))
+    console.print(f"selected group: {diagnostic['selected_group']}")
+    console.print(f"selected provider: {diagnostic['selected_provider'] or 'any'}")
+    enabled_groups = cast(list[str], diagnostic["enabled_groups"])
+    console.print(f"enabled groups: {', '.join(enabled_groups) or 'none'}")
+    required_env = cast(list[str], diagnostic["required_env_vars"])
+    if required_env:
+        console.print(f"required env vars: {', '.join(required_env)}")
+    disabled_matching = cast(list[str], diagnostic["disabled_matching_providers"])
+    if disabled_matching:
+        console.print(f"disabled matching providers: {', '.join(disabled_matching)}")
     selected = selected_deployments(cfg, group=group, provider=provider)
     if not selected:
-        console.print("no matching enabled deployments")
+        if diagnostic["error_code"] == "GROUP_DISABLED":
+            console.print("matching provider or group exists but is disabled")
+        else:
+            console.print("no matching enabled deployments")
+        for command in cast(list[str], diagnostic["next_commands"]):
+            console.print(f"next: {command}")
         raise typer.Exit(code=2)
     missing = missing_env_vars(cfg, group=group, provider=provider, required_only=True)
     if missing:
         console.print(f"missing required env vars: {', '.join(missing)}")
-        for env_var in missing:
-            console.print(f"next: export {env_var}=...")
+        for command in cast(list[str], diagnostic["next_commands"]):
+            console.print(f"next: {command}")
         raise typer.Exit(code=2)
     optional_missing = missing_env_vars(cfg, group=group, provider=provider, required_only=False)
     optional_missing = [env for env in optional_missing if env not in missing]

@@ -1,5 +1,23 @@
 # Troubleshooting
 
+## `mpf init` chose an unexpected provider
+
+With no `--provider` or `--preset`, `mpf init` chooses the first visible supported key in this
+order: OpenRouter, NVIDIA, Groq, Cerebras, Mistral. If no supported key is visible, it writes the
+OpenRouter starter config and tells you to export `OPENROUTER_API_KEY`.
+
+Fix:
+
+```bash
+mpf init --provider nvidia --overwrite
+# or use the provider whose key should drive this machine-local config
+mpf doctor --json
+```
+
+For agents and CI, the key must be visible in that process environment. A key set in another shell,
+desktop session, or secret store does not count until it is injected into the process running
+`mpf`.
+
 ## Missing `NVIDIA_NIM_API_KEY`
 
 Symptom:
@@ -33,6 +51,20 @@ Fix:
 export OPENROUTER_API_KEY=...
 mpf doctor --provider openrouter --live
 ```
+
+## Agent reports missing keys
+
+Use machine-readable diagnostics before running live provider tests:
+
+```bash
+mpf doctor --group free_reasoning --json
+```
+
+Read `error_code`:
+
+- `MISSING_REQUIRED_ENV` means the selected group exists, but the required key is absent.
+- `GROUP_NOT_FOUND` means the requested group is not configured.
+- `GROUP_DISABLED` means a matching provider/group exists only in disabled deployments.
 
 ## No smoke cases found
 

@@ -7,10 +7,14 @@ Rules:
 
 - Bundled presets are conservative defaults.
 - User-local config always wins over bundled presets.
+- `mpf init` auto-detects visible provider keys in deterministic order: OpenRouter, NVIDIA, Groq,
+  Cerebras, Mistral.
+- OpenRouter is the fallback starter only when no supported provider key is visible.
 - `mpf init --provider nvidia` is the primary high-capability remote preset.
-- `mpf init --provider openrouter` is the preferred first-run remote preset.
+- `mpf init --provider openrouter` is the explicit OpenRouter remote preset.
 - `mpf init --preset minimal` is the no-key offline preset for CLI/demo validation.
 - `mpf doctor` should fail fast only when required keys for the selected group/provider are missing.
+- `mpf doctor --json` is the stable readiness contract for agents and CI.
 - Optional or disabled providers should be reported as skipped/warnings, not first-run failures.
 - Live provider checks should be opt-in in CI.
 - Any free/dev endpoint may disappear, rate-limit, or change model behavior.
@@ -58,6 +62,14 @@ mpf providers guide openrouter
 mpf providers test nvidia
 mpf providers test openrouter
 ```
+
+Agent process requirements:
+
+- Provider keys must be visible in the agent or CI process environment, not only in an interactive
+  parent shell.
+- Use `mpf doctor --group free_reasoning --json` before live tests.
+- Treat `MISSING_REQUIRED_ENV`, `GROUP_NOT_FOUND`, and disabled matching provider/group errors as
+  distinct setup failures.
 
 Provider setup links:
 
