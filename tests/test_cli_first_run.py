@@ -57,6 +57,15 @@ def test_openrouter_doctor_missing_key_is_actionable(tmp_path, monkeypatch):
     assert "next: export OPENROUTER_API_KEY=..." in result.output
 
 
+def test_paths_reports_config_and_artifacts():
+    result = runner.invoke(app, ["paths"])
+
+    assert result.exit_code == 0, result.output
+    assert "config:" in result.output
+    assert "config.yaml" in result.output
+    assert "artifacts:" in result.output
+
+
 def test_provider_guide_reports_valid_provider_and_env_var():
     result = runner.invoke(app, ["providers", "guide", "openrouter"])
 

@@ -181,9 +181,12 @@ ModelPreflight requires Python 3.11+.
 
 ## Machine-local config
 
-ModelPreflight reads provider routes from `~/.config/model-preflight/config.yaml` by default. Override the path with either `--config` or `MODEL_PREFLIGHT_CONFIG`.
+ModelPreflight reads provider routes from your OS-specific user config directory by default.
+Use `mpf paths` to print the exact path. Override the path with either `--config` or
+`MODEL_PREFLIGHT_CONFIG`.
 
 ```bash
+mpf paths
 mpf init --provider openrouter
 mpf doctor
 mpf models
@@ -282,7 +285,8 @@ mpf models
 Use environment variables for secrets. Do not commit provider keys.
 
 If you use 1Password, see [`docs/secrets/1password.md`](docs/secrets/1password.md)
-for `op run` examples and an optional vault helper.
+for `op run` examples and an optional vault helper. The 1Password helper manages env vars;
+run `mpf init --provider <provider>` once to create the machine-local provider config.
 
 </details>
 

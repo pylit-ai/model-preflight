@@ -13,6 +13,7 @@ from rich.table import Table
 from .config import (
     AppConfig,
     Deployment,
+    default_config_path,
     load_config,
     missing_env_vars,
     selected_deployments,
@@ -118,6 +119,14 @@ def init(
             console.print(f"provider: {info.name}")
             console.print(f"set env var: {env_vars}")
     console.print("next: mpf doctor --live")
+
+
+@app.command()
+def paths() -> None:
+    """Print machine-local ModelPreflight paths."""
+    cfg = AppConfig()
+    console.print(f"config: {default_config_path()}")
+    console.print(f"artifacts: {cfg.artifacts_dir}")
 
 
 @app.command()

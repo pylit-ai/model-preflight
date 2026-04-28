@@ -4,6 +4,17 @@ ModelPreflight reads provider credentials from environment variables. 1Password
 is optional; plain shell exports, `.env` loaders, CI secrets, and other secret
 managers work as long as they provide the same env vars.
 
+1Password does not replace the ModelPreflight provider config. Create that
+machine-local config separately:
+
+```bash
+mpf paths
+mpf init --provider nvidia
+```
+
+`mpf paths` prints the OS-specific config path. On macOS this is usually under
+`~/Library/Application Support/`, not `~/.config/`.
+
 ## Recommended Local Pattern
 
 Use `op run` when you want secrets available only to a subprocess:
