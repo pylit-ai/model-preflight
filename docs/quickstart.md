@@ -9,6 +9,7 @@ export OPENROUTER_API_KEY=...
 mpf init
 mpf doctor --live
 mpf demo
+mpf ask "Write one sentence about why this route works."
 ```
 
 Expected signal:
@@ -17,6 +18,7 @@ Expected signal:
   OpenRouter starter config and tells you to export `OPENROUTER_API_KEY`.
 - `mpf doctor --live` prints a deployments table and `live check ok: group=...`.
 - `mpf demo` prints JSON with `"passed": true` and `"failures": []`.
+- `mpf ask` prints only the model response to stdout. Route/progress metadata goes to stderr.
 
 Then add project-local smoke cases:
 
@@ -44,6 +46,24 @@ mpf run
 The minimal preset uses an offline echo deployment. It verifies CLI wiring, config loading,
 project file creation, JSONL parsing, scoring, and audit writing without contacting a provider.
 It does not verify provider auth, quota, latency, or model quality.
+
+## One-off prompts and Pro Mode
+
+Use `ask` for a single routed model call:
+
+```bash
+mpf ask "Write a short poem about how ModelPreflight makes free endpoint checks easy."
+```
+
+Use `pro` when the prompt is worth sampling multiple times and synthesizing through a judge group:
+
+```bash
+mpf pro "Compare three schema strategies for this extraction task" -n 4 --artifact .model-preflight/artifacts/pro-run.json
+```
+
+`mpf pro` prints the final answer to stdout by default. Diagnostics go to stderr, and the artifact
+contains the prompt, provider/model routes, candidate responses, candidate errors, group winners,
+and final judge output. Use `--json` only when you want the full candidate payload on stdout.
 
 ## Provider setup
 

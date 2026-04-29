@@ -92,30 +92,28 @@ checks the key, and sends it out...
 ```
 
 Use `pro` when the prompt is worth asking several times. It fans out cheap samples, synthesizes the
-best answer through the reasoning group, and keeps an audit trail for which routes handled the
-calls.
+best answer through the judge group, and can save every candidate plus the judge output to an
+artifact for inspection.
 
 ```bash
-mpf pro "Write the strongest short pitch for ModelPreflight Pro Mode: explain why fanout across cheap or free endpoints plus a judge pass is better than trusting one brittle LLM call for a prototype decision. Include one caveat." --n 8
+mpf pro "Write the strongest short pitch for ModelPreflight Pro Mode: explain why fanout across cheap or free endpoints plus a judge pass is better than trusting one brittle LLM call for a prototype decision. Include one caveat." -n 8 --artifact .model-preflight/artifacts/pro-pitch.json
 ```
 
 Shape of the output:
 
-```json
-{
-  "final": "Pro Mode is useful when a prototype decision deserves more than one sample: fan out across cheap or free routes, compare independent answers, then synthesize the strongest result through a reasoning group...",
-  "candidates": [
-    {"index": 0, "ok": true, "text": "Fanout reduces single-sample luck..."},
-    {"index": 1, "ok": true, "text": "The value is cheap parallel exploration..."}
-  ],
-  "group_winners": []
-}
+```text
+Pro Mode is useful when a prototype decision deserves more than one sample: fan out across cheap
+or free routes, compare independent answers, then synthesize the strongest result through a judge
+group...
 ```
+
+The console stays focused on the final answer. The artifact contains the prompt, routes, candidate
+responses, candidate errors, group winners, and final judge output.
 
 For structured-output work:
 
 ```bash
-mpf pro "Design three robust JSON schemas for extracting vendor name, renewal date, total contract value, and termination notice from messy SaaS contracts. Include failure modes." --n 8
+mpf pro "Design three robust JSON schemas for extracting vendor name, renewal date, total contract value, and termination notice from messy SaaS contracts. Include failure modes." -n 8 --artifact .model-preflight/artifacts/schema-pro.json
 ```
 
 For repeatable project checks, write JSONL smoke cases once and run:
@@ -540,11 +538,18 @@ ModelPreflight records audit rows for live calls, but it does not enforce provid
 ```python
 from model_preflight import ModelGateway, load_config, pro_mode
 
-gateway = ModelGateway(load_config())
+config = load_config()
+gateway = ModelGateway(config)
 
 print(gateway.text("Return only: ok", group="free_reasoning"))
 
-result = pro_mode(gateway, "Solve this toy puzzle", n=8)
+result = pro_mode(
+    gateway,
+    "Solve this toy puzzle",
+    n=8,
+    sample_group=config.router.default_group,
+    judge_group=config.router.default_group,
+)
 print(result["final"])
 ```
 
@@ -600,7 +605,7 @@ mpf run
 mpf providers list
 mpf providers guide openrouter
 mpf models
-mpf pro "solve this toy task" --n 8
+mpf pro "solve this toy task" -n 4 --artifact .model-preflight/artifacts/pro-run.json
 ```
 
 </details>
