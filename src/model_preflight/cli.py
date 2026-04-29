@@ -116,6 +116,13 @@ def _ask_status(message: str, *, style: str = "dim") -> None:
     err_console.print(f"[mpf] {message}", markup=False)
 
 
+def _status(message: str, *, style: str = "dim") -> None:
+    if err_console.is_terminal:
+        err_console.print("[mpf] " + message, style=style)
+        return
+    err_console.print(f"[mpf] {message}", markup=False)
+
+
 def _required_env_vars(deployments: list[Deployment]) -> list[str]:
     return sorted({dep.api_key_env for dep in deployments if dep.required and dep.api_key_env})
 
@@ -577,15 +584,66 @@ def init_project(
 @app.command()
 def pro(
     prompt: str,
-    n: Annotated[int, typer.Option("--n", min=1, max=100)] = 8,
-    sample_group: Annotated[str, typer.Option("--sample-group")] = "free_fast",
-    judge_group: Annotated[str, typer.Option("--judge-group")] = "free_reasoning",
+    n: Annotated[int, typer.Option("--n", "-n", min=1, max=100)] = 8,
+    sample_group: Annotated[str | None, typer.Option("--sample-group")] = None,
+    judge_group: Annotated[str | None, typer.Option("--judge-group")] = None,
     path: Annotated[Path | None, typer.Option("--config")] = None,
+    artifact: Annotated[Path | None, typer.Option("--artifact", dir_okay=False)] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Run fanout + synthesis for a one-off prototype prompt."""
-    gw = ModelGateway(load_config(path))
-    result = run_pro_mode(gw, prompt, n=n, sample_group=sample_group, judge_group=judge_group)
-    console.print_json(json.dumps(result, default=str))
+    cfg = load_config(path)
+    effective_sample_group = sample_group or cfg.router.default_group
+    effective_judge_group = judge_group or cfg.router.default_group
+    _status(
+        "pro fanout "
+        f"n={n} sample_group={effective_sample_group} judge_group={effective_judge_group}",
+        style="dim cyan",
+    )
+    for route in _route_metadata(cfg, effective_sample_group):
+        _status(f"sample {route['provider']}: {route['model']}", style="dim cyan")
+    if effective_judge_group != effective_sample_group:
+        for route in _route_metadata(cfg, effective_judge_group):
+            _status(f"judge {route['provider']}: {route['model']}", style="dim cyan")
+    gw = ModelGateway(cfg)
+    result = run_pro_mode(
+        gw,
+        prompt,
+        n=n,
+        sample_group=effective_sample_group,
+        judge_group=effective_judge_group,
+    )
+    artifact_payload = {
+        "prompt": prompt,
+        "sample_group": effective_sample_group,
+        "judge_group": effective_judge_group,
+        "routes": {
+            "sample": _route_metadata(cfg, effective_sample_group),
+            "judge": _route_metadata(cfg, effective_judge_group),
+        },
+        "result": result,
+    }
+    if artifact is not None:
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_text(json.dumps(artifact_payload, indent=2, default=str), encoding="utf-8")
+        _status(f"artifact {artifact}", style="dim")
+    candidates = cast(list[dict[str, object]], result.get("candidates", []))
+    ok_count = sum(1 for candidate in candidates if candidate.get("ok"))
+    _status(f"pro candidates ok={ok_count}/{len(candidates)}", style="dim")
+    if not result.get("final"):
+        _status("all candidate generations failed or returned empty text", style="red")
+        for candidate in candidates[:5]:
+            if candidate.get("ok"):
+                continue
+            _status(
+                f"candidate {candidate.get('index')} error: {candidate.get('error')}",
+                style="red",
+            )
+        raise typer.Exit(code=2)
+    if json_output:
+        console.print_json(json.dumps(result, default=str))
+        return
+    console.print(str(result.get("final", "")))
 
 
 @providers_app.command("list")

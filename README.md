@@ -487,18 +487,42 @@ become a repeatable smoke case.
 ## Pro Mode
 
 `mpf pro` fans out a one-off prompt, then synthesizes a final answer through a judge group.
+By default, stdout contains only the final synthesized answer. Diagnostics go to stderr. Use
+`--json` to print the full candidate payload, or `--artifact` to save it while keeping the console
+focused on the final answer.
 
 ```bash
-mpf pro "Use fanout plus synthesis to choose a robust JSON schema strategy for extracting renewal terms from messy SaaS contracts. Return the final schema, validation rules, and the main failure mode." --n 8
+mpf pro "Use fanout plus synthesis to choose a robust JSON schema strategy for extracting renewal terms from messy SaaS contracts. Return the final schema, validation rules, and the main failure mode." -n 8
 ```
 
 Defaults:
 
 | Option | Default | Role |
 |--------|---------|------|
-| `--n` | `8` | number of sampled answers |
-| `--sample-group` | `free_fast` | fanout group |
-| `--judge-group` | `free_reasoning` | synthesis group |
+| `--n`, `-n` | `8` | number of sampled answers |
+| `--sample-group` | configured default group | fanout group |
+| `--judge-group` | configured default group | synthesis group |
+| `--artifact path/to/pro.json` | unset | write prompt, routes, candidates, group winners, and final answer to a JSON artifact |
+| `--json` | `false` | print full candidate payload to stdout instead of only the final answer |
+
+`mpf pro` prints route/progress diagnostics to stderr before the fanout starts:
+
+```text
+[mpf] pro fanout n=2 sample_group=free_reasoning judge_group=free_reasoning
+[mpf] sample nvidia: nvidia_nim/nvidia/nemotron-3-super-120b-a12b
+[mpf] sample openrouter: openrouter/nvidia/nemotron-3-super-120b-a12b:free
+[mpf] pro candidates ok=2/2
+```
+
+For post-run inspection:
+
+```bash
+mpf pro "Compare three prompt strategies for this extraction task" -n 4 --artifact .model-preflight/artifacts/pro-run.json
+```
+
+If every sample fails or returns empty text, the CLI exits non-zero and prints the first candidate
+errors instead of showing a Python traceback. The full candidate list is still available through
+`--artifact`.
 
 <details>
 <summary><img src="./docs/assets/readme-icons/lightning.svg" height="24" align="center" alt=""> <b>Cost and quota note</b></summary>

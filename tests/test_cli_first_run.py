@@ -242,6 +242,121 @@ def test_ask_show_model_reports_model_on_stderr(tmp_path):
     assert result.stderr.endswith("\n\n")
 
 
+def test_pro_accepts_short_n_and_defaults_to_ready_group(tmp_path, monkeypatch):
+    cfg = tmp_path / "config.yaml"
+    runner.invoke(app, ["init", "--preset", "minimal", "--config", str(cfg)])
+    calls = []
+
+    def fake_run_pro_mode(gateway, prompt, **kwargs):
+        calls.append({"prompt": prompt, **kwargs})
+        return {"final": "final", "candidates": [], "group_winners": []}
+
+    monkeypatch.setattr(cli, "run_pro_mode", fake_run_pro_mode)
+
+    result = CliRunner(mix_stderr=False).invoke(
+        app,
+        ["pro", "prompt", "-n", "2", "--config", str(cfg)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output == "final\n"
+    assert calls == [
+        {
+            "prompt": "prompt",
+            "n": 2,
+            "sample_group": "offline_echo",
+            "judge_group": "offline_echo",
+        }
+    ]
+    assert "[mpf] pro fanout n=2 sample_group=offline_echo judge_group=offline_echo" in (
+        result.stderr
+    )
+
+
+def test_pro_writes_diagnostic_artifact(tmp_path, monkeypatch):
+    cfg = tmp_path / "config.yaml"
+    runner.invoke(app, ["init", "--preset", "minimal", "--config", str(cfg)])
+    artifact = tmp_path / "pro.json"
+
+    def fake_run_pro_mode(gateway, prompt, **kwargs):
+        return {
+            "final": "final",
+            "candidates": [{"index": 0, "ok": True, "text": "candidate", "error": None}],
+            "group_winners": ["winner"],
+        }
+
+    monkeypatch.setattr(cli, "run_pro_mode", fake_run_pro_mode)
+
+    result = runner.invoke(
+        app,
+        ["pro", "prompt", "--config", str(cfg), "--artifact", str(artifact)],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+    assert payload["prompt"] == "prompt"
+    assert payload["result"]["final"] == "final"
+
+
+def test_pro_json_outputs_full_payload(tmp_path, monkeypatch):
+    cfg = tmp_path / "config.yaml"
+    runner.invoke(app, ["init", "--preset", "minimal", "--config", str(cfg)])
+
+    def fake_run_pro_mode(gateway, prompt, **kwargs):
+        return {
+            "final": "final",
+            "candidates": [{"index": 0, "ok": True, "text": "candidate", "error": None}],
+            "group_winners": [],
+        }
+
+    monkeypatch.setattr(cli, "run_pro_mode", fake_run_pro_mode)
+
+    result = CliRunner(mix_stderr=False).invoke(
+        app,
+        ["pro", "prompt", "--config", str(cfg), "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["final"] == "final"
+    assert payload["candidates"][0]["text"] == "candidate"
+
+
+def test_pro_reports_candidate_errors_when_all_samples_fail(tmp_path, monkeypatch):
+    cfg = tmp_path / "config.yaml"
+    runner.invoke(app, ["init", "--preset", "minimal", "--config", str(cfg)])
+
+    def fake_run_pro_mode(gateway, prompt, **kwargs):
+        return {
+            "final": "",
+            "candidates": [
+                {"index": 0, "ok": False, "text": "", "error": "No deployment for free_fast"},
+                {"index": 1, "ok": False, "text": "", "error": "No deployment for free_fast"},
+            ],
+            "group_winners": [],
+        }
+
+    monkeypatch.setattr(cli, "run_pro_mode", fake_run_pro_mode)
+
+    result = CliRunner(mix_stderr=False).invoke(
+        app,
+        [
+            "pro",
+            "prompt",
+            "--config",
+            str(cfg),
+            "--sample-group",
+            "free_fast",
+            "--judge-group",
+            "offline_echo",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "all candidate generations failed or returned empty text" in result.stderr
+    assert "No deployment for free_fast" in result.stderr
+
+
 def test_openrouter_doctor_missing_key_is_actionable(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     cfg = tmp_path / "config.yaml"

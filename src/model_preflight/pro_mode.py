@@ -99,7 +99,11 @@ def pro_mode(
     )
     nonempty = [c.text for c in candidate_results if c.ok and c.text.strip()]
     if not nonempty:
-        raise RuntimeError("all candidate generations were empty")
+        return {
+            "final": "",
+            "candidates": [asdict(c) for c in candidate_results],
+            "group_winners": [],
+        }
     if len(nonempty) <= tournament_group_size:
         final = synthesize(gateway, prompt, nonempty, group=judge_group, max_tokens=max_tokens)
         return {

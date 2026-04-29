@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
-
 from model_preflight.pro_mode import pro_mode
 
 
@@ -40,6 +38,10 @@ def test_pro_mode_synthesizes_from_successful_partial_fanout():
     assert "candidate 1 failed" not in synthesis_calls[0]["prompt"]
 
 
-def test_pro_mode_raises_when_all_candidates_fail():
-    with pytest.raises(RuntimeError, match="all candidate generations were empty"):
-        pro_mode(FlakyGateway(fail_all=True), "prompt", n=2, sample_group="sample")
+def test_pro_mode_returns_candidate_errors_when_all_candidates_fail():
+    result = pro_mode(FlakyGateway(fail_all=True), "prompt", n=2, sample_group="sample")
+
+    assert result["final"] == ""
+    assert result["group_winners"] == []
+    assert result["candidates"][0]["ok"] is False
+    assert "candidate 0 failed" in result["candidates"][0]["error"]
