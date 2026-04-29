@@ -35,6 +35,7 @@ secrets_app = typer.Typer(no_args_is_help=True, help="Machine-local secret sourc
 app.add_typer(providers_app, name="providers")
 app.add_typer(secrets_app, name="secrets")
 console = Console()
+err_console = Console(stderr=True)
 
 
 SMOKE_PATH = Path("evals/smoke.jsonl")
@@ -94,6 +95,25 @@ def _env_status(cfg: AppConfig, dep: Deployment) -> str:
 
 def _enabled_groups(cfg: AppConfig) -> list[str]:
     return sorted({dep.group for dep in cfg.deployments if dep.enabled})
+
+
+def _route_metadata(cfg: AppConfig, group: str) -> list[dict[str, str]]:
+    routes = []
+    for dep in selected_deployments(cfg, group=group):
+        routes.append(
+            {
+                "provider": dep.provider or "unknown",
+                "model": dep.model,
+            }
+        )
+    return routes
+
+
+def _ask_status(message: str, *, style: str = "dim") -> None:
+    if err_console.is_terminal:
+        err_console.print("[mpf] " + message, style=style)
+        return
+    err_console.print(f"[mpf] {message}", markup=False)
 
 
 def _required_env_vars(deployments: list[Deployment]) -> list[str]:
@@ -469,6 +489,59 @@ def demo(path: Annotated[Path | None, typer.Option("--config")] = None) -> None:
         raise typer.Exit(code=1)
 
 
+@app.command()
+def ask(
+    prompt: str,
+    group: Annotated[str | None, typer.Option("--group")] = None,
+    path: Annotated[Path | None, typer.Option("--config")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+    stream: Annotated[bool, typer.Option("--stream/--no-stream")] = True,
+    quiet: Annotated[bool, typer.Option("--quiet")] = False,
+    hide_route: Annotated[bool, typer.Option("--hide-route")] = False,
+) -> None:
+    """Ask one prompt through one configured model group."""
+    cfg = load_config(path)
+    selected_group = group or cfg.router.default_group
+    routes = _route_metadata(cfg, selected_group)
+    gateway = ModelGateway(cfg)
+    if json_output:
+        text = gateway.text(
+            prompt,
+            group=selected_group,
+            metadata={"runner": "ask", "group": selected_group, "stream": False},
+        )
+        payload: dict[str, object] = {"group": selected_group, "text": text}
+        if not hide_route:
+            payload["routes"] = routes
+        console.print_json(json.dumps(payload, indent=2))
+        return
+    if not quiet and not hide_route:
+        _ask_status(f"route {selected_group}", style="dim cyan")
+        for route in routes:
+            _ask_status(f"  {route['provider']}: {route['model']}", style="dim cyan")
+    if stream:
+        if not quiet:
+            _ask_status(
+                f"waiting for first token from {selected_group}...",
+                style="yellow",
+            )
+            err_console.print()
+        for chunk in gateway.stream_text(
+            prompt,
+            group=selected_group,
+            metadata={"runner": "ask", "group": selected_group, "stream": True},
+        ):
+            console.print(chunk, end="")
+        console.print()
+        return
+    text = gateway.text(
+        prompt,
+        group=selected_group,
+        metadata={"runner": "ask", "group": selected_group, "stream": False},
+    )
+    console.print(text)
+
+
 @app.command("init-project")
 def init_project(
     overwrite: Annotated[bool, typer.Option("--overwrite")] = False,
@@ -528,7 +601,9 @@ def providers_list(path: Annotated[Path | None, typer.Option("--config")] = None
         table.add_column(col)
     for info in PROVIDERS.values():
         is_configured = "no"
-        if configured and any(dep.provider == info.id for dep in configured.deployments):
+        if configured and any(
+            dep.provider == info.id and dep.enabled for dep in configured.deployments
+        ):
             is_configured = "yes"
         table.add_row(
             info.id,

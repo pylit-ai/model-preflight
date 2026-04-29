@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 
+from rich.console import Console
 from typer.testing import CliRunner
 
+from model_preflight import cli
 from model_preflight.cli import app
 
 runner = CliRunner()
@@ -53,6 +55,191 @@ def test_run_without_default_cases_points_to_init_project(tmp_path, monkeypatch)
 
     assert result.exit_code == 2
     assert "next: mpf init-project" in result.output
+
+
+def test_ask_sends_one_prompt_to_default_group(tmp_path):
+    cfg = tmp_path / "config.yaml"
+    runner.invoke(app, ["init", "--preset", "minimal", "--config", str(cfg)])
+
+    result = runner.invoke(
+        app,
+        [
+            "ask",
+            "Write a poem about how ModelPreflight makes free LLM endpoints easy.",
+            "--config",
+            str(cfg),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Write a poem about how ModelPreflight makes free LLM endpoints easy." in result.output
+    assert '"passed"' not in result.output
+
+
+def test_ask_json_reports_group_and_text(tmp_path):
+    cfg = tmp_path / "config.yaml"
+    runner.invoke(app, ["init", "--preset", "minimal", "--config", str(cfg)])
+
+    result = runner.invoke(
+        app,
+        [
+            "ask",
+            "Return only: ok",
+            "--config",
+            str(cfg),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload == {
+        "group": "offline_echo",
+        "routes": [
+            {
+                "provider": "offline",
+                "model": "offline/echo",
+            }
+        ],
+        "text": "Return only: ok",
+    }
+
+
+def test_ask_json_can_hide_route_metadata(tmp_path):
+    cfg = tmp_path / "config.yaml"
+    runner.invoke(app, ["init", "--preset", "minimal", "--config", str(cfg)])
+
+    result = runner.invoke(
+        app,
+        [
+            "ask",
+            "Return only: ok",
+            "--config",
+            str(cfg),
+            "--json",
+            "--hide-route",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload == {
+        "group": "offline_echo",
+        "text": "Return only: ok",
+    }
+
+
+def test_ask_streams_text_output_by_default(tmp_path, monkeypatch):
+    from model_preflight import cli
+
+    cfg = tmp_path / "config.yaml"
+    runner.invoke(app, ["init", "--preset", "minimal", "--config", str(cfg)])
+    calls = []
+
+    class FakeGateway:
+        def __init__(self, config):
+            calls.append(("init", config.router.default_group))
+
+        def stream_text(self, prompt, *, group=None, metadata=None):
+            calls.append(("stream", prompt, group, metadata))
+            yield "alpha"
+            yield " beta"
+
+    monkeypatch.setattr(cli, "ModelGateway", FakeGateway)
+
+    result = CliRunner(mix_stderr=False).invoke(
+        app,
+        ["ask", "stream please", "--config", str(cfg)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output == "alpha beta\n"
+    assert "[mpf] route offline_echo" in result.stderr
+    assert "[mpf]   offline: offline/echo" in result.stderr
+    assert "[mpf] waiting for first token from offline_echo" in result.stderr
+    assert result.stderr.endswith("\n\n")
+    assert calls[1] == (
+        "stream",
+        "stream please",
+        "offline_echo",
+        {"runner": "ask", "group": "offline_echo", "stream": True},
+    )
+
+
+def test_ask_no_stream_uses_buffered_text(tmp_path, monkeypatch):
+    from model_preflight import cli
+
+    cfg = tmp_path / "config.yaml"
+    runner.invoke(app, ["init", "--preset", "minimal", "--config", str(cfg)])
+    calls = []
+
+    class FakeGateway:
+        def __init__(self, config):
+            pass
+
+        def text(self, prompt, *, group=None, metadata=None):
+            calls.append(("text", prompt, group, metadata))
+            return "buffered"
+
+    monkeypatch.setattr(cli, "ModelGateway", FakeGateway)
+
+    result = CliRunner(mix_stderr=False).invoke(
+        app,
+        ["ask", "buffer please", "--config", str(cfg), "--no-stream"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output == "buffered\n"
+    assert "[mpf] route offline_echo" in result.stderr
+    assert calls == [
+        (
+            "text",
+            "buffer please",
+            "offline_echo",
+            {"runner": "ask", "group": "offline_echo", "stream": False},
+        )
+    ]
+
+
+def test_ask_quiet_keeps_stderr_clean(tmp_path, monkeypatch):
+    from model_preflight import cli
+
+    cfg = tmp_path / "config.yaml"
+    runner.invoke(app, ["init", "--preset", "minimal", "--config", str(cfg)])
+
+    class FakeGateway:
+        def __init__(self, config):
+            pass
+
+        def stream_text(self, prompt, *, group=None, metadata=None):
+            yield "clean"
+
+    monkeypatch.setattr(cli, "ModelGateway", FakeGateway)
+
+    result = CliRunner(mix_stderr=False).invoke(
+        app,
+        ["ask", "quiet please", "--config", str(cfg), "--quiet"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output == "clean\n"
+    assert result.stderr == ""
+
+
+def test_ask_show_model_reports_model_on_stderr(tmp_path):
+    cfg = tmp_path / "config.yaml"
+    runner.invoke(app, ["init", "--preset", "minimal", "--config", str(cfg)])
+
+    result = CliRunner(mix_stderr=False).invoke(
+        app,
+        ["ask", "Return only: ok", "--config", str(cfg)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output == "Return only: ok\n"
+    assert "[mpf] route offline_echo" in result.stderr
+    assert "[mpf]   offline: offline/echo" in result.stderr
+    assert result.stderr.endswith("\n\n")
 
 
 def test_openrouter_doctor_missing_key_is_actionable(tmp_path, monkeypatch):
@@ -263,3 +450,30 @@ def test_provider_guide_reports_valid_provider_and_env_var():
     assert result.exit_code == 0, result.output
     assert "OPENROUTER_API_KEY" in result.output
     assert "mpf doctor --provider openrouter --live" in result.output
+
+
+def test_providers_list_counts_only_enabled_deployments_as_configured(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "console", Console(width=240, color_system=None))
+    cfg = tmp_path / "config.yaml"
+    init_result = runner.invoke(
+        app,
+        [
+            "init",
+            "--provider",
+            "nvidia",
+            "--fallback",
+            "openrouter",
+            "--config",
+            str(cfg),
+        ],
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    result = runner.invoke(app, ["providers", "list", "--config", str(cfg)])
+
+    assert result.exit_code == 0, result.output
+    assert "│ nvidia     │ nvidia         │ NVIDIA_NIM_API_KEY │ yes" in result.output
+    assert "│ openrouter │ openrouter     │ OPENROUTER_API_KEY │ yes" in result.output
+    assert "│ groq       │ multi-free-dev │ GROQ_API_KEY       │ no" in result.output
+    assert "│ cerebras   │ multi-free-dev │ CEREBRAS_API_KEY   │ no" in result.output
+    assert "│ mistral    │ multi-free-dev │ MISTRAL_API_KEY    │ no" in result.output

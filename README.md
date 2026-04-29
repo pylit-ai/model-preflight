@@ -2,9 +2,11 @@
 
 # <img src="./docs/assets/readme-icons/preflight.svg" height="48" align="center" alt=""> **ModelPreflight**
 
-**Preflight checks for LLM prototypes.**
+**Find out which cheap or free-ish LLM endpoints can carry your prototype before you wire them into your app.**
 
-**A tiny local gateway for smoke tests, provider failover, and cheap prototype checks before you wire an LLM into something bigger.**
+ModelPreflight turns scattered provider keys into stable local groups like `free_reasoning`
+and `free_fast`, then lets you smoke-test prompts, fan out one-off questions, and fail over
+between providers without hard-coding model IDs everywhere.
 
 [![CI](https://github.com/pylit-ai/model-preflight/actions/workflows/ci.yml/badge.svg)](https://github.com/pylit-ai/model-preflight/actions/workflows/ci.yml)
 [![Python versions](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
@@ -16,18 +18,120 @@
 
 | If you want to... | Start here |
 |-------------------|------------|
+| See the free/dev endpoint menu | [Free endpoint map](#free-endpoint-map) |
+| Try the payoff after setup | [Run one check, then ask the pool](#run-one-check-then-ask-the-pool) |
 | Get one green check quickly | [60-second start](#60-second-start) |
 | Try it without keys | [No-key demo path](#no-key-demo-path) |
-| Configure provider groups once | [Machine-local config](#machine-local-config) |
 | Run project smoke cases | [Smoke tests](#smoke-tests) |
-| Fan out a one-off prompt | [Pro Mode](#pro-mode) |
 | Use it as a Python helper | [Library usage](#library-usage) |
 
 ---
 
-ModelPreflight keeps provider setup **machine-local** and keeps smoke cases **project-local**. It gives prototypes stable model-group aliases, simple failover, and JSONL audit logs without becoming a benchmark harness or hosted gateway.
+ModelPreflight keeps provider setup **machine-local** and smoke cases **project-local**. It is
+not a hosted gateway, model leaderboard, or pricing oracle. It is the fast local preflight layer
+between "I found a promising free/dev endpoint" and "this provider is now wired into my product."
 
 </div>
+
+---
+
+## Free endpoint map
+
+The high-value path is simple: collect provider keys once, let ModelPreflight group them, then
+ask `free_reasoning` or `free_fast` instead of memorizing every provider's model slug and quota
+page.
+
+| Provider | What it gives a prototype | Default group | Key env var | Setup |
+|----------|---------------------------|---------------|-------------|-------|
+| OpenRouter | Lowest-friction first run; one API key can route to free-tagged and paid models | `free_reasoning` | `OPENROUTER_API_KEY` | [Auth docs](https://openrouter.ai/docs/api-reference/authentication) |
+| NVIDIA Build / NIM | High-capability open/open-weight hosted endpoints while the current dev access fits | `free_reasoning` | `NVIDIA_NIM_API_KEY` | [API keys](https://build.nvidia.com/settings/api-keys) |
+| Groq | Very fast repeated calls for fanout and smoke checks when free-plan limits fit | `free_fast` | `GROQ_API_KEY` | [Console keys](https://console.groq.com/keys) |
+| Cerebras | Fast inference experiments for short prototype loops | `free_fast` | `CEREBRAS_API_KEY` | [Inference docs](https://inference-docs.cerebras.ai/) |
+| Mistral | First-party checks against Mistral model families | `free_reasoning` | `MISTRAL_API_KEY` | [Account setup](https://docs.mistral.ai/getting-started/quickstart/#account-setup) |
+
+The bundled presets are intentionally conservative starter data, not a claim that a provider will
+remain free, available, or quota-identical for every account. Provider catalogs, free tiers, and
+rate limits move; `mpf doctor --live` is the truth test for your machine today.
+
+Secondary routes worth adding once the first pool works: Google Gemini/Gemma, Cloudflare Workers AI,
+GitHub Models, Hugging Face Inference Providers, and SambaNova. See
+[`docs/PROVIDER_PRESETS.md`](./docs/PROVIDER_PRESETS.md) for the broader preset notes.
+
+## Run one check, then ask the pool
+
+After one provider key is configured, first prove that the route works:
+
+```bash
+mpf demo
+```
+
+Shape of the output:
+
+```json
+[
+  {
+    "id": "demo-ok",
+    "passed": true,
+    "failures": [],
+    "text": "ok"
+  }
+]
+```
+
+Then ask a real one-off prompt with a single routed model call. Text output streams by default:
+
+```bash
+mpf ask "Write a poem about how ModelPreflight is the easiest way to try free LLM endpoints."
+```
+
+Shape of the output:
+
+```text
+ModelPreflight finds the route,
+checks the key, and sends it out...
+```
+
+Use `pro` when the prompt is worth asking several times. It fans out cheap samples, synthesizes the
+best answer through the reasoning group, and keeps an audit trail for which routes handled the
+calls.
+
+```bash
+mpf pro "Write the strongest short pitch for ModelPreflight Pro Mode: explain why fanout across cheap or free endpoints plus a judge pass is better than trusting one brittle LLM call for a prototype decision. Include one caveat." --n 8
+```
+
+Shape of the output:
+
+```json
+{
+  "final": "Pro Mode is useful when a prototype decision deserves more than one sample: fan out across cheap or free routes, compare independent answers, then synthesize the strongest result through a reasoning group...",
+  "candidates": [
+    {"index": 0, "ok": true, "text": "Fanout reduces single-sample luck..."},
+    {"index": 1, "ok": true, "text": "The value is cheap parallel exploration..."}
+  ],
+  "group_winners": []
+}
+```
+
+For structured-output work:
+
+```bash
+mpf pro "Design three robust JSON schemas for extracting vendor name, renewal date, total contract value, and termination notice from messy SaaS contracts. Include failure modes." --n 8
+```
+
+For repeatable project checks, write JSONL smoke cases once and run:
+
+```bash
+mpf init-project
+mpf run
+```
+
+`mpf demo` proves the configured route works. `mpf ask` is for a single one-off prompt. `mpf pro`
+is for fanout plus synthesis. `mpf run` is for project-owned smoke files that should keep passing
+as prompts, providers, and model slugs drift.
+
+For the snappiest CLI startup, install once with `uv tool install model-preflight` or
+`pipx install model-preflight`, then run `mpf ...` directly. `uv run mpf ...` may print package
+sync messages before ModelPreflight starts.
 
 ---
 
@@ -357,12 +461,35 @@ These checks are intentionally simple. They are meant to catch obvious routing, 
 
 ---
 
+## Ask
+
+`mpf ask` sends one prompt through one configured model group and prints the model text to stdout.
+Plain text streams as tokens arrive. Progress and route metadata go to stderr by default, so stdout
+stays clean for pipes and command substitution. In an interactive terminal, stderr status lines are
+styled and separated from the answer by a blank line. Use `--quiet` to suppress all stderr status
+lines, or `--hide-route` to hide provider/model route metadata while keeping progress visible. JSON
+output is buffered so it remains valid JSON and includes route metadata unless `--hide-route` is set.
+
+```bash
+mpf ask "Write a poem about how ModelPreflight is the easiest way to use free LLM endpoints."
+mpf ask "Write a shell-safe tagline" --quiet
+mpf ask "Which model route is this using?"
+mpf ask "Keep route metadata hidden, but show progress" --hide-route
+mpf ask "Summarize why free endpoint preflight matters" --no-stream
+mpf ask "Return JSON only: {\"ok\": true}" --group free_reasoning --json
+```
+
+Use `ask` for quick manual checks, demos, and shell snippets. Use `run` when the same prompt should
+become a repeatable smoke case.
+
+---
+
 ## Pro Mode
 
 `mpf pro` fans out a one-off prompt, then synthesizes a final answer through a judge group.
 
 ```bash
-mpf pro "Suggest three robust JSON schemas for this toy extraction task" --n 8
+mpf pro "Use fanout plus synthesis to choose a robust JSON schema strategy for extracting renewal terms from messy SaaS contracts. Return the final schema, validation rules, and the main failure mode." --n 8
 ```
 
 Defaults:
@@ -443,6 +570,7 @@ See [`docs/EVAL_PROVENANCE.md`](./docs/EVAL_PROVENANCE.md) for provenance expect
 mpf init --provider openrouter
 mpf doctor --live
 mpf demo
+mpf ask "write a tiny launch blurb for ModelPreflight"
 mpf init-project
 mpf run
 mpf providers list

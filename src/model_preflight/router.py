@@ -56,6 +56,7 @@ class ModelGateway:
         top_p: float | None = None,
         max_tokens: int | None = None,
         n: int | None = None,
+        stream: bool | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> Any:
         model_group = group or self.config.router.default_group
@@ -85,6 +86,7 @@ class ModelGateway:
             top_p=top_p,
             max_tokens=max_tokens,
             n=n,
+            stream=stream,
         )
         latency_ms = (time.perf_counter() - started) * 1000
         self._audit(
@@ -107,6 +109,21 @@ class ModelGateway:
             **kwargs,
         )
         return resp.choices[0].message.content or ""
+
+    def stream_text(self, prompt: str, *, group: str | None = None, **kwargs: Any) -> Any:
+        resp = self.completion(
+            [{"role": "user", "content": prompt}],
+            group=group,
+            stream=True,
+            **kwargs,
+        )
+        if isinstance(resp, _OfflineResponse):
+            yield resp.choices[0].message.content or ""
+            return
+        for chunk in resp:
+            text = _stream_delta_text(chunk)
+            if text:
+                yield text
 
     def _offline_deployment(self, group: str) -> Deployment | None:
         for dep in self.enabled_deployments:
@@ -141,3 +158,14 @@ class _OfflineResponse:
     def __init__(self, *, text: str, model: str) -> None:
         self.model = model
         self.choices = [_OfflineChoice(text)]
+
+
+def _stream_delta_text(chunk: Any) -> str:
+    try:
+        return chunk.choices[0].delta.content or ""
+    except AttributeError:
+        pass
+    try:
+        return chunk["choices"][0]["delta"].get("content") or ""
+    except (KeyError, IndexError, TypeError):
+        return ""
