@@ -96,7 +96,16 @@ best answer through the judge group, and can save every candidate plus the judge
 artifact for inspection.
 
 ```bash
-mpf pro "Write the strongest short pitch for ModelPreflight Pro Mode: explain why fanout across cheap or free endpoints plus a judge pass is better than trusting one brittle LLM call for a prototype decision. Include one caveat." -n 8 --artifact .model-preflight/artifacts/pro-pitch.json
+PROMPT=$(cat <<'PROMPT'
+Write the strongest short pitch for ModelPreflight Pro Mode: explain why fanout
+across cheap or free endpoints plus a judge pass is better than trusting one
+brittle LLM call for a prototype decision. Include one caveat.
+PROMPT
+)
+
+mpf pro "$PROMPT" \
+  -n 8 \
+  --artifact .model-preflight/artifacts/pro-pitch.json
 ```
 
 Shape of the output:
@@ -113,7 +122,16 @@ responses, candidate errors, group winners, and final judge output.
 For structured-output work:
 
 ```bash
-mpf pro "Design three robust JSON schemas for extracting vendor name, renewal date, total contract value, and termination notice from messy SaaS contracts. Include failure modes." -n 8 --artifact .model-preflight/artifacts/schema-pro.json
+PROMPT=$(cat <<'PROMPT'
+Design three robust JSON schemas for extracting vendor name, renewal date,
+total contract value, and termination notice from messy SaaS contracts. Include
+failure modes.
+PROMPT
+)
+
+mpf pro "$PROMPT" \
+  -n 8 \
+  --artifact .model-preflight/artifacts/schema-pro.json
 ```
 
 For repeatable project checks, write JSONL smoke cases once and run:
@@ -469,7 +487,9 @@ lines, or `--hide-route` to hide provider/model route metadata while keeping pro
 output is buffered so it remains valid JSON and includes route metadata unless `--hide-route` is set.
 
 ```bash
-mpf ask "Write a poem about how ModelPreflight is the easiest way to use free LLM endpoints."
+PROMPT="Write a poem about how ModelPreflight is the easiest way to use free LLM endpoints."
+
+mpf ask "$PROMPT"
 mpf ask "Write a shell-safe tagline" --quiet
 mpf ask "Which model route is this using?"
 mpf ask "Keep route metadata hidden, but show progress" --hide-route
@@ -490,7 +510,15 @@ By default, stdout contains only the final synthesized answer. Diagnostics go to
 focused on the final answer.
 
 ```bash
-mpf pro "Use fanout plus synthesis to choose a robust JSON schema strategy for extracting renewal terms from messy SaaS contracts. Return the final schema, validation rules, and the main failure mode." -n 8
+PROMPT=$(cat <<'PROMPT'
+Use fanout plus synthesis to choose a robust JSON schema strategy for extracting
+renewal terms from messy SaaS contracts. Return the final schema, validation
+rules, and the main failure mode.
+PROMPT
+)
+
+mpf pro "$PROMPT" \
+  -n 8
 ```
 
 Defaults:
@@ -515,7 +543,9 @@ Defaults:
 For post-run inspection:
 
 ```bash
-mpf pro "Compare three prompt strategies for this extraction task" -n 4 --artifact .model-preflight/artifacts/pro-run.json
+mpf pro "Compare three prompt strategies for this extraction task" \
+  -n 4 \
+  --artifact .model-preflight/artifacts/pro-run.json
 ```
 
 If every sample fails or returns empty text, the CLI exits non-zero and prints the first candidate
@@ -605,7 +635,9 @@ mpf run
 mpf providers list
 mpf providers guide openrouter
 mpf models
-mpf pro "solve this toy task" -n 4 --artifact .model-preflight/artifacts/pro-run.json
+mpf pro "solve this toy task" \
+  -n 4 \
+  --artifact .model-preflight/artifacts/pro-run.json
 ```
 
 </details>
