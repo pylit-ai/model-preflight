@@ -1,6 +1,6 @@
 <div align="center">
 
-# <img src="./docs/assets/readme-icons/preflight.svg" height="48" align="center" alt=""> **ModelPreflight**
+# <img src="https://raw.githubusercontent.com/pylit-ai/model-preflight/main/docs/assets/readme-icons/preflight.svg" height="48" align="center" alt="ModelPreflight compass icon"> **ModelPreflight**
 
 **Find out which cheap or free-ish LLM endpoints can carry your prototype before you wire them into your app.**
 
@@ -14,13 +14,17 @@ between providers without hard-coding model IDs everywhere.
 ![License](https://img.shields.io/badge/license-Apache--2.0-lightgrey.svg)
 ![LiteLLM](https://img.shields.io/badge/router-LiteLLM-informational)
 
-<img src="./docs/assets/hero.png" alt="ModelPreflight hero image" width="900">
+<img src="https://raw.githubusercontent.com/pylit-ai/model-preflight/main/docs/assets/hero.png" alt="ModelPreflight CLI preview showing provider preflight workflow" width="900">
+
+<!-- TODO: Add terminal demo GIF showing no-key setup, mpf demo, and mpf run output. -->
+<!-- TODO: Add product screenshot showing live provider diagnostics with JSON mode. -->
+<!-- TODO: Add 60-second setup video link. -->
 
 | If you want to... | Start here |
 |-------------------|------------|
+| Get one green check now | [First green check](#first-green-check) |
 | See the free/dev endpoint menu | [Free endpoint map](#free-endpoint-map) |
 | Try the payoff after setup | [Run one check, then ask the pool](#run-one-check-then-ask-the-pool) |
-| Get one green check quickly | [60-second start](#60-second-start) |
 | Try it without keys | [No-key demo path](#no-key-demo-path) |
 | Run project smoke cases | [Smoke tests](#smoke-tests) |
 | Compare adjacent tools | [ModelPreflight vs LiteLLM vs promptfoo vs Langfuse](./docs/comparison.md) |
@@ -36,11 +40,54 @@ between "I found a promising free/dev endpoint" and "this provider is now wired 
 
 ---
 
+## First green check
+
+Run the CLI without creating accounts or exporting provider keys:
+
+```bash
+uvx model-preflight --help
+uvx model-preflight init --preset minimal
+uvx model-preflight demo
+```
+
+Expected signal:
+
+```json
+[
+  {
+    "id": "demo-ok",
+    "passed": true,
+    "failures": [],
+    "text": "ok"
+  }
+]
+```
+
+Next command if this fails:
+
+```bash
+uvx model-preflight doctor
+```
+
+Then install persistently when you want `mpf` as the short command:
+
+```bash
+uv tool install model-preflight
+mpf init --preset minimal
+mpf demo
+```
+
+---
+
 ## Free endpoint map
 
 The high-value path is simple: collect provider keys once, let ModelPreflight group them, then
 ask `free_reasoning` or `free_fast` instead of memorizing every provider's model slug and quota
 page.
+
+Provider notes last reviewed: 2026-04-30. Catalogs, free tiers, quotas, and model IDs can change
+without a ModelPreflight release; use each provider console plus `mpf doctor --live` as the current
+truth for your account.
 
 | Provider | What it gives a prototype | Default group | Key env var | Setup |
 |----------|---------------------------|---------------|-------------|-------|
@@ -654,6 +701,38 @@ uv run mypy src
 Package metadata lives in [`pyproject.toml`](./pyproject.toml). Tests live under [`tests/`](./tests/).
 
 </details>
+
+---
+
+## For coding agents
+
+Use these deterministic commands before changing provider routes, README examples, or release
+surface docs:
+
+```bash
+uv sync
+uv run pytest tests/test_readme_quality.py
+uv run pytest
+uv run ruff check .
+uv run mypy src
+```
+
+README verification should pass before release-oriented README edits land. The focused README check
+asserts that the first success path stays above the endpoint map, media URLs remain package-registry
+safe, provider claims include a review date, and agent-facing commands stay discoverable.
+
+Stable public paths:
+
+| Path | Use |
+|------|-----|
+| [`README.md`](./README.md) | landing page, quickstart, and navigation hub |
+| [`docs/quickstart.md`](./docs/quickstart.md) | deeper first-run walkthrough |
+| [`docs/troubleshooting.md`](./docs/troubleshooting.md) | recovery steps after failed checks |
+| [`docs/PROVIDER_PRESETS.md`](./docs/PROVIDER_PRESETS.md) | provider preset notes and drift warnings |
+| [`docs/release-verification.md`](./docs/release-verification.md) | release and package-rendering checks |
+
+Do not copy private specs, non-public provider/account names, internal URLs, or private agent protocol
+files into this public repository. Use environment variables or user-local config for secrets.
 
 ---
 
