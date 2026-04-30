@@ -9,7 +9,7 @@ fail() {
   exit 1
 }
 
-if git ls-files | grep -E '(^|/)(\.claude|\.codex|\.cursor|\.gemini|\.metactl|specs|overlays)(/|$)' >/dev/null; then
+if git ls-files | grep -E '(^|/)(\.claude|\.codex|\.cursor|\.gemini|\.metactl|\.omc|specs|overlays)(/|$)' >/dev/null; then
   fail "private/generated agent or overlay paths are tracked in the public repo"
 fi
 
@@ -21,7 +21,7 @@ if git ls-files | grep -E '(^|/)(AGENTS\.local\.md|CLAUDE\.local\.md|GEMINI\.loc
   fail "local/private adapter files are tracked in the public repo"
 fi
 
-if git ls-files -o --exclude-standard | grep -E '(^|/)(\.claude|\.codex|\.cursor|\.gemini|\.metactl|specs|overlays)(/|$)' >/dev/null; then
+if git ls-files -o --exclude-standard | grep -E '(^|/)(\.claude|\.codex|\.cursor|\.gemini|\.metactl|\.omc|specs|overlays)(/|$)' >/dev/null; then
   fail "private/generated agent or overlay paths are present as untracked public files"
 fi
 

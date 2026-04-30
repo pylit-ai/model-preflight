@@ -38,6 +38,7 @@ artifacts/
 ### Local metactl state
 /.metactl/
 /metactl.local.yaml
+/.omc/
 
 # Private/generated agent and overlay artifacts must not be committed here.
 /.claude/
