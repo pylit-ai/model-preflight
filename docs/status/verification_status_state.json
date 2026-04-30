@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "timestamp": "2026-04-27T22:48:28Z",
+  "timestamp": "2026-04-30T00:00:00Z",
   "branch": "main",
   "commit": "c0396cc",
   "task_id": "modelpreflight-first-run-ux-release-readiness",
-  "overall_status": "READY_WITH_WARNINGS",
-  "readiness_target": "First-run UX and package release readiness with offline verification complete and optional live-provider evidence pending credentials.",
+  "overall_status": "READY_WITH_LIVE_EVIDENCE",
+  "readiness_target": "First-run UX and package release readiness with offline verification complete and private-env live-provider evidence confirmed.",
   "objective_sources": [
     {
       "path": "docs/first-run-ux-contract.md",
@@ -30,11 +30,11 @@
     {
       "id": "AXIS-UX",
       "name": "First-run UX behavior",
-      "score": 0.92,
-      "confidence": 0.9,
+      "score": 0.95,
+      "confidence": 0.92,
       "status": "PASS",
       "cap": 0.95,
-      "top_limiter": "Remote one-key live transcript not run because no provider credential was established."
+      "top_limiter": "Provider facts remain best-effort because live provider behavior can drift."
     },
     {
       "id": "AXIS-TEST",
@@ -57,11 +57,11 @@
     {
       "id": "AXIS-LIVE",
       "name": "Live provider evidence",
-      "score": 0.6,
-      "confidence": 0.55,
-      "status": "UNVERIFIED",
-      "cap": 0.7,
-      "top_limiter": "OPENROUTER_API_KEY or equivalent live credential not provided."
+      "score": 0.9,
+      "confidence": 0.82,
+      "status": "PASS",
+      "cap": 0.9,
+      "top_limiter": "Live behavior can drift after verification because provider/account state is external."
     }
   ],
   "gates": [
@@ -122,11 +122,20 @@
     {
       "id": "G-007",
       "axis": "AXIS-LIVE",
-      "requirement": "One-provider OpenRouter live transcript completes under the activation target.",
+      "requirement": "OpenRouter live check completes under the activation target.",
       "priority": "OPTIONAL_DIAGNOSTIC",
-      "status": "UNVERIFIED",
+      "status": "PASS",
       "verifiability": "V2",
-      "evidence": "Not run; requires operator-provided OPENROUTER_API_KEY."
+      "evidence": "2026-04-30 private-env init -> doctor --live -> demo: PASS; public record redacted to provider and pass/fail status."
+    },
+    {
+      "id": "G-008",
+      "axis": "AXIS-LIVE",
+      "requirement": "NVIDIA live check completes under the activation target.",
+      "priority": "OPTIONAL_DIAGNOSTIC",
+      "status": "PASS",
+      "verifiability": "V2",
+      "evidence": "2026-04-30 private-env init -> doctor --live -> demo: PASS; public record redacted to provider and pass/fail status."
     }
   ],
   "evidence": [
@@ -165,6 +174,18 @@
       "kind": "package_inspection",
       "command": "uv run python zipfile inspection",
       "result": "PASS: minimal.yaml, openrouter.yaml, multi-free-dev.yaml included"
+    },
+    {
+      "id": "E-007",
+      "kind": "runtime_transcript",
+      "command": "private-env OpenRouter init -> doctor --live -> demo",
+      "result": "PASS: redacted public summary only"
+    },
+    {
+      "id": "E-008",
+      "kind": "runtime_transcript",
+      "command": "private-env NVIDIA init -> doctor --live -> demo",
+      "result": "PASS: redacted public summary only"
     }
   ],
   "regressions": [],
@@ -172,18 +193,12 @@
   "loop_closure_queue": [
     {
       "rank": 1,
-      "action": "Run optional OpenRouter live transcript with operator-provided OPENROUTER_API_KEY.",
-      "closure_score": 3.65,
-      "closes": ["G-007"]
-    },
-    {
-      "rank": 2,
       "action": "Add CI packaging artifact inspection if package-data drift recurs.",
       "closure_score": 2.85,
       "closes": ["G-006"]
     },
     {
-      "rank": 3,
+      "rank": 2,
       "action": "Add structured JSON output for doctor/providers if agents need machine parsing beyond exit codes.",
       "closure_score": 2.5,
       "closes": []
@@ -196,6 +211,6 @@
   ],
   "open_risks": [
     "Provider catalogs, pricing, and rate limits can drift outside repo control.",
-    "Remote live behavior is not verified in this run because credentials were not established."
+    "Remote provider behavior can drift after verification because provider catalogs, accounts, quotas, and model availability are outside repo control."
   ]
 }

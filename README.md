@@ -23,6 +23,7 @@ between providers without hard-coding model IDs everywhere.
 | Get one green check quickly | [60-second start](#60-second-start) |
 | Try it without keys | [No-key demo path](#no-key-demo-path) |
 | Run project smoke cases | [Smoke tests](#smoke-tests) |
+| Compare adjacent tools | [ModelPreflight vs LiteLLM vs promptfoo vs Langfuse](./docs/comparison.md) |
 | Use it as a Python helper | [Library usage](#library-usage) |
 
 ---
