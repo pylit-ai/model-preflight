@@ -58,7 +58,9 @@ mpf ask "Write a short poem about how ModelPreflight makes free endpoint checks 
 Use `pro` when the prompt is worth sampling multiple times and synthesizing through a judge group:
 
 ```bash
-mpf pro "Compare three schema strategies for this extraction task" -n 4 --artifact .model-preflight/artifacts/pro-run.json
+mpf pro "Compare three schema strategies for this extraction task" \
+  -n 4 \
+  --artifact .model-preflight/artifacts/pro-run.json
 ```
 
 `mpf pro` prints the final answer to stdout by default. Diagnostics go to stderr, and the artifact

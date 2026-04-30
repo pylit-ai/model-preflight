@@ -92,8 +92,7 @@ checks the key, and sends it out...
 ```
 
 Use `pro` when the prompt is worth asking several times. It fans out cheap samples, synthesizes the
-best answer through the judge group, and can save every candidate plus the judge output to an
-artifact for inspection.
+best answer through the judge group, and prints the final answer by default.
 
 ```bash
 PROMPT=$(cat <<'PROMPT'
@@ -104,8 +103,7 @@ PROMPT
 )
 
 mpf pro "$PROMPT" \
-  -n 8 \
-  --artifact .model-preflight/artifacts/pro-pitch.json
+  -n 8
 ```
 
 Shape of the output:
@@ -116,10 +114,10 @@ or free routes, compare independent answers, then synthesize the strongest resul
 group...
 ```
 
-The console stays focused on the final answer. The artifact contains the prompt, routes, candidate
-responses, candidate errors, group winners, and final judge output.
+The console stays focused on the final answer. Add `--artifact` when you want the prompt, routes,
+candidate responses, candidate errors, group winners, and final judge output saved for inspection.
 
-For structured-output work:
+For structured-output work where you want to inspect all candidates:
 
 ```bash
 PROMPT=$(cat <<'PROMPT'
