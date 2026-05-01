@@ -6,19 +6,23 @@
 uv tool install model-preflight
 export OPENROUTER_API_KEY=...
 # or export NVIDIA_NIM_API_KEY=...
-mpf init
-mpf doctor --live
-mpf demo
-mpf ask "Write one sentence about why this route works."
+mpf init --provider openrouter
+mpf ask "In one sentence, explain why checking an LLM route before wiring it into an app saves time."
 ```
 
 Expected signal:
 
-- `mpf init` chooses the first visible supported provider key. With no key visible, it writes the
-  OpenRouter starter config and tells you to export `OPENROUTER_API_KEY`.
-- `mpf doctor --live` prints a deployments table and `live check ok: group=...`.
-- `mpf demo` prints JSON with `"passed": true` and `"failures": []`.
+- `mpf init --provider openrouter` writes a machine-local config for the selected provider.
 - `mpf ask` prints only the model response to stdout. Route/progress metadata goes to stderr.
+- If a key, provider, or route is missing, the command prints the missing env var or route name.
+
+Use doctor when you want a fuller diagnostics table:
+
+```bash
+mpf doctor --live
+```
+
+Expected signal: `live check ok: group=...`.
 
 Then add project-local smoke cases:
 
@@ -37,7 +41,6 @@ Expected signal:
 
 ```bash
 mpf init --preset minimal
-mpf doctor --live
 mpf demo
 mpf init-project
 mpf run
@@ -63,9 +66,16 @@ mpf pro "Compare three schema strategies for this extraction task" \
   --artifact .model-preflight/artifacts/pro-run.json
 ```
 
+`-n 4` samples four candidate answers before the judge pass. Start low when testing paid routes;
+fanout multiplies provider calls.
+
 `mpf pro` prints the final answer to stdout by default. Diagnostics go to stderr, and the artifact
 contains the prompt, provider/model routes, candidate responses, candidate errors, group winners,
 and final judge output. Use `--json` only when you want the full candidate payload on stdout.
+
+This is related to the self-consistency idea in LLM research: sample multiple reasoning paths, then
+select or synthesize a better answer than a single greedy response. See Google's ICLR 2023 paper,
+[Self-Consistency Improves Chain of Thought Reasoning in Language Models](https://research.google/pubs/self-consistency-improves-chain-of-thought-reasoning-in-language-models/).
 
 ## Provider setup
 
@@ -116,3 +126,7 @@ Cloudflare Workers AI, GitHub Models, Hugging Face Inference Providers, and Samb
 
 Provider preset data is starter data, not a provider catalog guarantee. Check the provider's current
 model catalog, pricing, and rate limits before depending on a route.
+
+For custom config paths, JSON diagnostics, linked dotenv files, and YAML examples, see
+[`configuration.md`](./configuration.md). For coding-agent setup prompts, see
+[`agent-operations.md`](./agent-operations.md).

@@ -22,13 +22,14 @@ between providers without hard-coding model IDs everywhere.
 
 | If you want to... | Start here |
 |-------------------|------------|
-| Get one green check now | [First green check](#first-green-check) |
+| Ask one model through a configured route | [Ask your first prompt](#ask-your-first-prompt) |
 | See the free/dev endpoint menu | [Free endpoint map](#free-endpoint-map) |
-| Try the payoff after setup | [Run one check, then ask the pool](#run-one-check-then-ask-the-pool) |
-| Try it without keys | [No-key demo path](#no-key-demo-path) |
+| Compare several cheap samples before deciding | [Fan out with Pro Mode](#fan-out-with-pro-mode) |
+| Test the CLI without provider keys | [No-key demo path](#no-key-demo-path) |
 | Run project smoke cases | [Smoke tests](#smoke-tests) |
+| Hand setup to a coding agent | [Agent operations](#agent-operations) |
 | Compare adjacent tools | [ModelPreflight vs LiteLLM vs promptfoo vs Langfuse](./docs/comparison.md) |
-| Use it as a Python helper | [Library usage](#library-usage) |
+| Use it from code or agent hooks | [Library usage and adapters](#library-usage-and-adapters) |
 
 ---
 
@@ -40,41 +41,51 @@ between "I found a promising free/dev endpoint" and "this provider is now wired 
 
 ---
 
-## First green check
+## Ask your first prompt
 
-Run the CLI without creating accounts or exporting provider keys:
-
-```bash
-uvx model-preflight --help
-uvx model-preflight init --preset minimal
-uvx model-preflight demo
-```
-
-Expected signal:
-
-```json
-[
-  {
-    "id": "demo-ok",
-    "passed": true,
-    "failures": [],
-    "text": "ok"
-  }
-]
-```
-
-Next command if this fails:
-
-```bash
-uvx model-preflight doctor
-```
-
-Then install persistently when you want `mpf` as the short command:
+Install the CLI and ask one routed model call:
 
 ```bash
 uv tool install model-preflight
+export OPENROUTER_API_KEY=...
+mpf init --provider openrouter
+mpf ask "In one sentence, explain why checking an LLM route before wiring it into an app saves time."
+```
+
+Expected shape:
+
+```text
+Checking the route first catches missing keys, model drift, and provider failures before they break
+the prototype path that depends on them.
+```
+
+If a key, provider, or route is missing, `mpf ask` prints a direct error with the missing env var or
+route name. Use `mpf doctor --live` when you want a fuller diagnostics table:
+
+```bash
+mpf doctor --live
+```
+
+No provider key yet? Use the local echo preset to verify install, config loading, and project smoke
+test wiring without contacting an external API:
+
+```bash
 mpf init --preset minimal
 mpf demo
+```
+
+The `minimal` preset is intentionally boring: one offline echo deployment that returns predictable
+text. It proves the CLI and local files work; it does not prove provider auth, quota, latency, or
+model quality.
+
+Want an agent to initialize this repo? Paste this into Codex, Claude Code, Copilot, Gemini CLI, or
+Cursor while you keep reading:
+
+```text
+Initialize ModelPreflight in this repository. Use the no-key minimal preset first, keep provider
+secrets out of the repo, run `mpf demo`, then add project-local smoke cases if this repo has LLM
+prompts or provider calls. Use this public workflow if you need details:
+https://github.com/pylit-ai/model-preflight/blob/main/docs/agent-operations.md
 ```
 
 ---
@@ -105,42 +116,18 @@ Secondary routes worth adding once the first pool works: Google Gemini/Gemma, Cl
 GitHub Models, Hugging Face Inference Providers, and SambaNova. See
 [`docs/PROVIDER_PRESETS.md`](./docs/PROVIDER_PRESETS.md) for the broader preset notes.
 
-## Run one check, then ask the pool
+## Fan out with Pro Mode
 
-After one provider key is configured, first prove that the route works:
-
-```bash
-mpf demo
-```
-
-Shape of the output:
-
-```json
-[
-  {
-    "id": "demo-ok",
-    "passed": true,
-    "failures": [],
-    "text": "ok"
-  }
-]
-```
-
-Then ask a real one-off prompt with a single routed model call. Text output streams by default:
+Use `ask` for one routed call and `pro` when a prompt is worth sampling several times before a
+judge pass:
 
 ```bash
-mpf ask "Write a poem about how ModelPreflight is the easiest way to try free LLM endpoints."
+mpf ask "Write a shell-safe tagline for this LLM prototype."
 ```
-
-Shape of the output:
-
-```text
-ModelPreflight finds the route,
-checks the key, and sends it out...
-```
-
-Use `pro` when the prompt is worth asking several times. It fans out cheap samples, synthesizes the
-best answer through the judge group, and prints the final answer by default.
+[Self-Consistency Improves Chain of Thought Reasoning in Language Models](https://research.google/pubs/self-consistency-improves-chain-of-thought-reasoning-in-language-models/)
+from Google Research / ICLR 2023
+shows the broader value of sampling multiple reasoning paths instead of trusting one greedy answer;
+ModelPreflight applies a practical version of that idea to prototype prompts and provider routes.
 
 ```bash
 PROMPT=$(cat <<'PROMPT'
@@ -154,29 +141,16 @@ mpf pro "$PROMPT" \
   -n 8
 ```
 
-Shape of the output:
+`-n 8` means "sample 8 candidate answers before the judge pass." Start lower when testing paid
+routes; fanout multiplies provider calls.
 
-```text
-Pro Mode is useful when a prototype decision deserves more than one sample: fan out across cheap
-or free routes, compare independent answers, then synthesize the strongest result through a judge
-group...
-```
-
-The console stays focused on the final answer. Add `--artifact` when you want the prompt, routes,
-candidate responses, candidate errors, group winners, and final judge output saved for inspection.
-
-For structured-output work where you want to inspect all candidates:
+The console prints only the final answer by default. Add `--artifact` when you want the prompt,
+routes, candidate responses, candidate errors, group winners, and final judge output saved for
+inspection:
 
 ```bash
-PROMPT=$(cat <<'PROMPT'
-Design three robust JSON schemas for extracting vendor name, renewal date,
-total contract value, and termination notice from messy SaaS contracts. Include
-failure modes.
-PROMPT
-)
-
-mpf pro "$PROMPT" \
-  -n 8 \
+mpf pro "Compare three JSON schema strategies for this extraction task" \
+  -n 4 \
   --artifact .model-preflight/artifacts/schema-pro.json
 ```
 
@@ -350,140 +324,24 @@ ModelPreflight requires Python 3.11+.
 
 ---
 
-## Machine-local config
+## Configuration and secrets
 
-ModelPreflight reads provider routes and secret-source references from your OS-specific user config directory by default.
-Use `mpf paths` to print the exact path. Override the path with either `--config` or
-`MODEL_PREFLIGHT_CONFIG`.
+ModelPreflight keeps provider routing in your OS-specific user config directory and smoke cases in
+each project. Print the exact paths with:
 
 ```bash
 mpf paths
-mpf init
-mpf doctor
-mpf models
 ```
 
-With no `--provider` or `--preset`, `mpf init` checks visible environment variables in this order:
-`OPENROUTER_API_KEY`, `NVIDIA_NIM_API_KEY`, `GROQ_API_KEY`, `CEREBRAS_API_KEY`,
-`MISTRAL_API_KEY`. OpenRouter is only the fallback starter when none of those keys are visible.
-Explicit `--provider` and `--preset` always override auto-detection.
-
-Provider keys are not stored in the config. For local cross-project use, link a machine-local
-dotenv file that stays outside this public package:
+Provider keys stay in environment variables or a private linked dotenv file:
 
 ```bash
 mpf setup --env-file /path/to/private/.env
-```
-
-Process env vars still win over linked dotenv values, which keeps CI and production behavior
-compatible with standard secret injection.
-
-Provider setup is discoverable from the CLI:
-
-```bash
-mpf providers list
-mpf providers guide nvidia
-mpf providers guide openrouter
-mpf providers test nvidia
-mpf providers test openrouter
-```
-
-NVIDIA Build / NIM is the primary high-capability open/open-weight endpoint option. OpenRouter is
-still the lowest-friction discovery option because one API key can route to many model providers
-through an OpenAI-compatible API.
-
-Use either primary path:
-
-```bash
-mpf setup --env-file /path/to/private/.env
-mpf doctor --group free_reasoning --live
-
-mpf init --provider openrouter
-export OPENROUTER_API_KEY=...
-mpf doctor --provider openrouter --live
-```
-
-For agent and CI readiness checks, make sure provider keys are visible in the agent process
-environment or through a linked machine-local secret source, then use JSON diagnostics:
-
-```bash
 mpf doctor --group free_reasoning --json
 ```
 
-`status: "ok"` means config and required keys are present. `error_code` distinguishes
-`MISSING_REQUIRED_ENV`, `GROUP_NOT_FOUND`, and disabled matching provider/group cases.
-
-| Provider | Best for | Env var | Setup |
-|----------|----------|---------|-------|
-| NVIDIA Build / NIM | Primary high-capability open/open-weight endpoint pool | `NVIDIA_NIM_API_KEY` | [API keys](https://build.nvidia.com/settings/api-keys) |
-| OpenRouter | One-key first run with broad model access | `OPENROUTER_API_KEY` | [Authentication docs](https://openrouter.ai/docs/api-reference/authentication) |
-| Groq | Fast repeated calls after first-run setup works | `GROQ_API_KEY` | [Groq console](https://console.groq.com/keys) |
-| Cerebras | Fast inference experiments when current dev-tier limits fit | `CEREBRAS_API_KEY` | [Cerebras inference docs](https://inference-docs.cerebras.ai/) |
-| Mistral | First-party Mistral model-family smoke checks | `MISTRAL_API_KEY` | [Mistral API keys](https://docs.mistral.ai/getting-started/quickstart/#account-setup) |
-
-Secondary/overflow pool to add manually once the primary pool works: Google Gemini/Gemma,
-Cloudflare Workers AI, GitHub Models, Hugging Face Inference Providers, and SambaNova. These are
-documented in [`docs/PROVIDER_PRESETS.md`](./docs/PROVIDER_PRESETS.md), but not packaged as
-first-run presets yet because auth shape, model IDs, and free/dev limits are more account-specific.
-
-The default config creates logical groups, then maps each group to one or more LiteLLM deployments:
-
-```yaml
-router:
-  num_retries: 1
-  timeout_seconds: 60
-  default_group: free_reasoning
-  audit_jsonl: null
-artifacts_dir: ~/.cache/model-preflight/artifacts
-
-deployments:
-  - name: nvidia_nim_nemotron_3_super
-    provider: nvidia
-    group: free_reasoning
-    model: nvidia_nim/nvidia/nemotron-3-super-120b-a12b
-    api_key_env: NVIDIA_NIM_API_KEY
-    enabled: true
-    required: true
-    status: best_effort
-    setup_url: https://build.nvidia.com/settings/api-keys
-    rpm: 10
-    tier: reasoning
-```
-
-<details>
-<summary><img src="./docs/assets/readme-icons/settings.svg" height="24" align="center" alt=""> <b>Provider preset discipline</b></summary>
-
-Provider presets are best-effort starter data, not authoritative claims about free availability.
-
-- user-local config wins over bundled defaults
-- `mpf doctor` fails fast when required keys are missing
-- optional/disabled providers do not block first-run checks
-- live checks should be opt-in in CI
-- endpoint names, quotas, pricing, and behavior can change without this repo knowing
-
-See [`docs/PROVIDER_PRESETS.md`](./docs/PROVIDER_PRESETS.md) for the preset rules.
-
-</details>
-
-<details>
-<summary><img src="./docs/assets/readme-icons/grid.svg" height="24" align="center" alt=""> <b>Custom config path</b></summary>
-
-```bash
-mpf init --config ./model-preflight.yaml
-mpf doctor --config ./model-preflight.yaml
-mpf doctor --config ./model-preflight.yaml --live
-
-export MODEL_PREFLIGHT_CONFIG="$PWD/model-preflight.yaml"
-mpf models
-```
-
-Use environment variables for secrets. Do not commit provider keys.
-
-If you use 1Password, see [`docs/secrets/1password.md`](docs/secrets/1password.md)
-for linked dotenv and `op run` examples. Run `mpf init --provider <provider>` once to create
-the machine-local provider config.
-
-</details>
+Use [`docs/configuration.md`](./docs/configuration.md) for provider-selection order, custom config
+paths, JSON diagnostics, the YAML shape, and preset discipline.
 
 ---
 
@@ -609,7 +467,10 @@ ModelPreflight records audit rows for live calls, but it does not enforce provid
 
 ---
 
-## Library usage
+## Library usage and adapters
+
+Most users should start with the CLI. Use the Python API when a Python project wants to reuse the
+same machine-local config and routing directly:
 
 ```python
 from model_preflight import ModelGateway, load_config, pro_mode
@@ -634,6 +495,11 @@ The library API is intentionally thin:
 - `load_config()` reads the same machine-local config as the CLI
 - `ModelGateway` wraps LiteLLM Router with stable group aliases and audit logging
 - `pro_mode()` runs fanout plus synthesis for one-off prototype prompts
+
+There is no TypeScript SDK yet. JavaScript and TypeScript projects can call the CLI directly or use
+the bridge in [`examples/node_hook_example.mjs`](./examples/node_hook_example.mjs). A dedicated
+TypeScript package is probably only worth adding after real users need typed in-process APIs rather
+than shellable `mpf` commands.
 
 ---
 
@@ -704,10 +570,23 @@ Package metadata lives in [`pyproject.toml`](./pyproject.toml). Tests live under
 
 ---
 
-## For coding agents
+## Agent operations
 
-Use these deterministic commands before changing provider routes, README examples, or release
-surface docs:
+ModelPreflight ships agent-ready setup and operations prompts in
+[`docs/agent-operations.md`](./docs/agent-operations.md). Use them when you want Codex, Claude
+Code, Copilot, Gemini CLI, Cursor, or another coding agent to add preflight checks to a target repo
+without pasting the whole README into context.
+
+Agent entrypoints:
+
+| Artifact | Use |
+|----------|-----|
+| [`docs/agent-operations.md`](./docs/agent-operations.md) | copy-paste prompts and tool-specific placement |
+| [`docs/agent-specs/setup-model-preflight.md`](./docs/agent-specs/setup-model-preflight.md) | self-contained setup spec |
+| [`docs/agent-specs/provider-drift-check.md`](./docs/agent-specs/provider-drift-check.md) | provider drift diagnostic spec |
+| [`skills/model-preflight/SKILL.md`](./skills/model-preflight/SKILL.md) | optional agent skill for runtimes that support skills |
+
+Before changing provider routes, README examples, or release-surface docs in this repo, run:
 
 ```bash
 uv sync
@@ -718,8 +597,9 @@ uv run mypy src
 ```
 
 README verification should pass before release-oriented README edits land. The focused README check
-asserts that the first success path stays above the endpoint map, media URLs remain package-registry
-safe, provider claims include a review date, and agent-facing commands stay discoverable.
+asserts that the first useful prompt stays above the endpoint map, media URLs remain
+package-registry safe, provider claims include a review date, and agent-facing commands stay
+discoverable.
 
 Stable public paths:
 
@@ -727,6 +607,7 @@ Stable public paths:
 |------|-----|
 | [`README.md`](./README.md) | landing page, quickstart, and navigation hub |
 | [`docs/quickstart.md`](./docs/quickstart.md) | deeper first-run walkthrough |
+| [`docs/configuration.md`](./docs/configuration.md) | provider routing, secrets, and config shape |
 | [`docs/troubleshooting.md`](./docs/troubleshooting.md) | recovery steps after failed checks |
 | [`docs/PROVIDER_PRESETS.md`](./docs/PROVIDER_PRESETS.md) | provider preset notes and drift warnings |
 | [`docs/release-verification.md`](./docs/release-verification.md) | release and package-rendering checks |
