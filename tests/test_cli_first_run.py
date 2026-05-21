@@ -147,13 +147,13 @@ def test_ask_streams_text_output_by_default(tmp_path, monkeypatch):
 
     monkeypatch.setattr(cli, "ModelGateway", FakeGateway)
 
-    result = CliRunner(mix_stderr=False).invoke(
+    result = runner.invoke(
         app,
         ["ask", "stream please", "--config", str(cfg)],
     )
 
     assert result.exit_code == 0, result.output
-    assert result.output == "alpha beta\n"
+    assert result.stdout == "alpha beta\n"
     assert "[mpf] route offline_echo" in result.stderr
     assert "[mpf]   offline: offline/echo" in result.stderr
     assert "[mpf] waiting for first token from offline_echo" in result.stderr
@@ -183,13 +183,13 @@ def test_ask_no_stream_uses_buffered_text(tmp_path, monkeypatch):
 
     monkeypatch.setattr(cli, "ModelGateway", FakeGateway)
 
-    result = CliRunner(mix_stderr=False).invoke(
+    result = runner.invoke(
         app,
         ["ask", "buffer please", "--config", str(cfg), "--no-stream"],
     )
 
     assert result.exit_code == 0, result.output
-    assert result.output == "buffered\n"
+    assert result.stdout == "buffered\n"
     assert "[mpf] route offline_echo" in result.stderr
     assert calls == [
         (
@@ -216,13 +216,13 @@ def test_ask_quiet_keeps_stderr_clean(tmp_path, monkeypatch):
 
     monkeypatch.setattr(cli, "ModelGateway", FakeGateway)
 
-    result = CliRunner(mix_stderr=False).invoke(
+    result = runner.invoke(
         app,
         ["ask", "quiet please", "--config", str(cfg), "--quiet"],
     )
 
     assert result.exit_code == 0, result.output
-    assert result.output == "clean\n"
+    assert result.stdout == "clean\n"
     assert result.stderr == ""
 
 
@@ -230,13 +230,13 @@ def test_ask_show_model_reports_model_on_stderr(tmp_path):
     cfg = tmp_path / "config.yaml"
     runner.invoke(app, ["init", "--preset", "minimal", "--config", str(cfg)])
 
-    result = CliRunner(mix_stderr=False).invoke(
+    result = runner.invoke(
         app,
         ["ask", "Return only: ok", "--config", str(cfg)],
     )
 
     assert result.exit_code == 0, result.output
-    assert result.output == "Return only: ok\n"
+    assert result.stdout == "Return only: ok\n"
     assert "[mpf] route offline_echo" in result.stderr
     assert "[mpf]   offline: offline/echo" in result.stderr
     assert result.stderr.endswith("\n\n")
@@ -253,13 +253,13 @@ def test_pro_accepts_short_n_and_defaults_to_ready_group(tmp_path, monkeypatch):
 
     monkeypatch.setattr(cli, "run_pro_mode", fake_run_pro_mode)
 
-    result = CliRunner(mix_stderr=False).invoke(
+    result = runner.invoke(
         app,
         ["pro", "prompt", "-n", "2", "--config", str(cfg)],
     )
 
     assert result.exit_code == 0, result.output
-    assert result.output == "final\n"
+    assert result.stdout == "final\n"
     assert calls == [
         {
             "prompt": "prompt",
@@ -311,13 +311,13 @@ def test_pro_json_outputs_full_payload(tmp_path, monkeypatch):
 
     monkeypatch.setattr(cli, "run_pro_mode", fake_run_pro_mode)
 
-    result = CliRunner(mix_stderr=False).invoke(
+    result = runner.invoke(
         app,
         ["pro", "prompt", "--config", str(cfg), "--json"],
     )
 
     assert result.exit_code == 0, result.output
-    payload = json.loads(result.output)
+    payload = json.loads(result.stdout)
     assert payload["final"] == "final"
     assert payload["candidates"][0]["text"] == "candidate"
 
@@ -338,7 +338,7 @@ def test_pro_reports_candidate_errors_when_all_samples_fail(tmp_path, monkeypatc
 
     monkeypatch.setattr(cli, "run_pro_mode", fake_run_pro_mode)
 
-    result = CliRunner(mix_stderr=False).invoke(
+    result = runner.invoke(
         app,
         [
             "pro",
@@ -383,6 +383,7 @@ def test_init_without_visible_keys_reports_openrouter_fallback(tmp_path, monkeyp
 
 def test_doctor_json_missing_env_has_stable_error(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setenv("MODEL_PREFLIGHT_CONFIG", str(tmp_path / "default.yaml"))
     cfg = tmp_path / "config.yaml"
     runner.invoke(app, ["init", "--provider", "openrouter", "--config", str(cfg)])
 
@@ -399,6 +400,48 @@ def test_doctor_json_missing_env_has_stable_error(tmp_path, monkeypatch):
     assert payload["enabled_groups"] == ["free_reasoning"]
     assert payload["missing_env_vars"] == ["OPENROUTER_API_KEY"]
     assert payload["next_commands"] == ["export OPENROUTER_API_KEY=..."]
+
+
+def test_doctor_json_warns_when_custom_config_omits_default_dotenv(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    default_cfg = tmp_path / "default.yaml"
+    custom_cfg = tmp_path / "custom.yaml"
+    env_path = tmp_path / "private.env"
+    env_path.write_text("OPENROUTER_API_KEY=secret-value\n", encoding="utf-8")
+    monkeypatch.setenv("MODEL_PREFLIGHT_CONFIG", str(default_cfg))
+
+    default_init = runner.invoke(app, ["init", "--provider", "openrouter"])
+    assert default_init.exit_code == 0, default_init.output
+    link_result = runner.invoke(app, ["secrets", "link", str(env_path)])
+    assert link_result.exit_code == 0, link_result.output
+    custom_init = runner.invoke(
+        app,
+        ["init", "--provider", "openrouter", "--config", str(custom_cfg)],
+    )
+    assert custom_init.exit_code == 0, custom_init.output
+
+    result = runner.invoke(
+        app,
+        ["doctor", "--config", str(custom_cfg), "--group", "free_reasoning", "--json"],
+    )
+
+    assert result.exit_code == 2
+    payload = json.loads(result.output)
+    assert payload["status"] == "error"
+    assert payload["error_code"] == "MISSING_REQUIRED_ENV"
+    assert payload["missing_env_vars"] == ["OPENROUTER_API_KEY"]
+    assert payload["warnings"] == [
+        "Custom config does not include default dotenv secret source(s) "
+        "that can satisfy missing required env vars. Custom configs do not "
+        "inherit global credentials; link the dotenv source explicitly."
+    ]
+    assert payload["next_commands"] == [
+        "export OPENROUTER_API_KEY=...",
+        f"model-preflight secrets link {env_path} --config {custom_cfg}",
+    ]
+    assert "secret-value" not in result.output
 
 
 def test_doctor_json_group_not_found_has_stable_error(tmp_path):

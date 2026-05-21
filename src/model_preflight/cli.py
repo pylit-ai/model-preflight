@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import time
 from pathlib import Path
 from typing import Annotated, cast
@@ -19,6 +20,7 @@ from .config import (
     link_dotenv_secret_source,
     load_config,
     missing_env_vars,
+    resolve_secret,
     secret_source_status,
     selected_deployments,
     write_config,
@@ -145,6 +147,43 @@ def _disabled_matching_deployments(
     ]
 
 
+def _canonical_path(path: Path) -> str:
+    return str(path.expanduser().resolve())
+
+
+def _dotenv_source_paths(cfg: AppConfig) -> list[Path]:
+    return [
+        source.path.expanduser()
+        for source in cfg.secrets.sources
+        if source.kind == "dotenv" and source.path is not None
+    ]
+
+
+def _omitted_default_dotenv_sources(cfg: AppConfig, missing: list[str]) -> list[Path]:
+    if cfg.config_path is None or not missing:
+        return []
+    default_path = default_config_path()
+    if _canonical_path(cfg.config_path) == _canonical_path(default_path):
+        return []
+    if not default_path.exists():
+        return []
+
+    try:
+        default_cfg = load_config(default_path)
+    except Exception:
+        return []
+
+    if not any(resolve_secret(default_cfg, env_var) for env_var in missing):
+        return []
+
+    current_paths = {_canonical_path(path) for path in _dotenv_source_paths(cfg)}
+    return [
+        path
+        for path in _dotenv_source_paths(default_cfg)
+        if _canonical_path(path) not in current_paths
+    ]
+
+
 def _doctor_diagnostic(
     cfg: AppConfig,
     *,
@@ -161,6 +200,7 @@ def _doctor_diagnostic(
     next_commands: list[str] = []
     warnings: list[str] = []
     error_code: str | None = None
+    omitted_default_dotenv_sources = _omitted_default_dotenv_sources(cfg, missing)
 
     if not selected:
         if disabled_matching:
@@ -184,6 +224,19 @@ def _doctor_diagnostic(
     elif missing:
         error_code = "MISSING_REQUIRED_ENV"
         next_commands.extend(f"export {env_var}=..." for env_var in missing)
+
+    if omitted_default_dotenv_sources:
+        warnings.append(
+            "Custom config does not include default dotenv secret source(s) "
+            "that can satisfy missing required env vars. Custom configs do not "
+            "inherit global credentials; link the dotenv source explicitly."
+        )
+        if cfg.config_path is not None:
+            next_commands.extend(
+                "model-preflight secrets link "
+                f"{shlex.quote(str(path))} --config {shlex.quote(str(cfg.config_path))}"
+                for path in omitted_default_dotenv_sources
+            )
 
     return {
         "status": "error" if error_code else "ok",
