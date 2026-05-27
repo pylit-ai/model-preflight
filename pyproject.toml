@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "model-preflight"
-version = "0.1.16"
+version = "0.1.18"
 description = "Preflight checks for LLM prototypes."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,7 +28,7 @@ Repository = "https://github.com/pylit-ai/model-preflight"
 Issues = "https://github.com/pylit-ai/model-preflight/issues"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.4", "ruff>=0.12", "mypy>=1.17"]
+dev = ["pytest>=8.4", "ruff>=0.12", "mypy>=1.17", "types-PyYAML>=6.0"]
 keyring = ["keyring>=25"]
 
 [project.scripts]
