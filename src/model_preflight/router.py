@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +58,8 @@ class ModelGateway:
         max_tokens: int | None = None,
         n: int | None = None,
         stream: bool | None = None,
+        reasoning: dict[str, Any] | None = None,
+        include_reasoning: bool | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> Any:
         model_group = group or self.config.router.default_group
@@ -79,15 +82,20 @@ class ModelGateway:
         if self.router is None:
             raise ValueError(f"No live deployment configured for group {model_group!r}")
         started = time.perf_counter()
-        response = self.router.completion(
-            model=model_group,
-            messages=messages,
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_tokens,
-            n=n,
-            stream=stream,
-        )
+        completion_kwargs: dict[str, Any] = {
+            "model": model_group,
+            "messages": messages,
+            "temperature": temperature,
+            "top_p": top_p,
+            "max_tokens": max_tokens,
+            "n": n,
+            "stream": stream,
+        }
+        if reasoning is not None:
+            completion_kwargs["reasoning"] = reasoning
+        if include_reasoning is not None:
+            completion_kwargs["include_reasoning"] = include_reasoning
+        response = self.router.completion(**completion_kwargs)
         latency_ms = (time.perf_counter() - started) * 1000
         self._audit(
             {
@@ -103,12 +111,15 @@ class ModelGateway:
         return response
 
     def text(self, prompt: str, *, group: str | None = None, **kwargs: Any) -> str:
+        return self.text_result(prompt, group=group, **kwargs).text
+
+    def text_result(self, prompt: str, *, group: str | None = None, **kwargs: Any) -> TextResult:
         resp = self.completion(
             [{"role": "user", "content": prompt}],
             group=group,
             **kwargs,
         )
-        return resp.choices[0].message.content or ""
+        return _text_result_from_response(resp)
 
     def stream_text(self, prompt: str, *, group: str | None = None, **kwargs: Any) -> Any:
         resp = self.completion(
@@ -169,3 +180,74 @@ def _stream_delta_text(chunk: Any) -> str:
         return chunk["choices"][0]["delta"].get("content") or ""
     except (KeyError, IndexError, TypeError):
         return ""
+
+
+@dataclass(frozen=True)
+class TextResult:
+    text: str
+    reasoning: str | None = None
+    reasoning_details: Any | None = None
+    reasoning_summary: Any | None = None
+    usage: Any | None = None
+    model: str | None = None
+    response_id: str | None = None
+
+
+def _field(obj: Any, name: str) -> Any:
+    if isinstance(obj, dict):
+        return obj.get(name)
+    return getattr(obj, name, None)
+
+
+def _jsonable(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, list):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, tuple):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if hasattr(value, "model_dump"):
+        return _jsonable(value.model_dump())
+    if hasattr(value, "dict"):
+        return _jsonable(value.dict())
+    if hasattr(value, "__dict__"):
+        return _jsonable(vars(value))
+    return str(value)
+
+
+def _first_choice(response: Any) -> Any:
+    choices = _field(response, "choices") or []
+    return choices[0] if choices else None
+
+
+def _choice_message(choice: Any) -> Any:
+    return _field(choice, "message") if choice is not None else None
+
+
+def _text_result_from_response(response: Any) -> TextResult:
+    choice = _first_choice(response)
+    message = _choice_message(choice)
+    reasoning = (
+        _field(message, "reasoning")
+        or _field(message, "reasoning_content")
+        or _field(message, "thinking")
+    )
+    reasoning_summary = (
+        _field(message, "reasoning_summary")
+        or _field(message, "summary")
+        or _field(response, "reasoning_summary")
+        or _field(response, "summary")
+    )
+    return TextResult(
+        text=_field(message, "content") or "",
+        reasoning=reasoning,
+        reasoning_details=_jsonable(_field(message, "reasoning_details")),
+        reasoning_summary=_jsonable(reasoning_summary),
+        usage=_jsonable(_field(response, "usage")),
+        model=_field(response, "model"),
+        response_id=_field(response, "id"),
+    )
