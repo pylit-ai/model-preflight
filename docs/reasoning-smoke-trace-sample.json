@@ -1,0 +1,12 @@
+{
+  "route": "free_reasoning",
+  "reasoning": null,
+  "reasoning_details": null,
+  "reasoning_summary": null,
+  "usage": null,
+  "error": "AuthenticationError: litellm.AuthenticationError: AuthenticationError: OpenrouterException - {\"error\":{\"message\":\"No cookie auth credentials found\",\"code\":401}}. Received Model Group=free_reasoning\nAvailable Model Group Fallbacks=None",
+  "failures": [
+    "provider exception: AuthenticationError: litellm.AuthenticationError: AuthenticationError: OpenrouterException - {\"error\":{\"message\":\"No cookie auth credentials found\",\"code\":401}}. Received Model Group=free_reasoning\nAvailable Model Group Fallbacks=None"
+  ],
+  "status": "failed"
+}

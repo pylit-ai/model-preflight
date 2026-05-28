@@ -30,6 +30,8 @@ between providers without hard-coding model IDs everywhere.
 | Hand setup to a coding agent | [Agent operations](#agent-operations) |
 | Compare adjacent tools | [ModelPreflight vs LiteLLM vs promptfoo vs Langfuse](./docs/comparison.md) |
 | Use it from code or agent hooks | [Library usage and adapters](#library-usage-and-adapters) |
+| Check scope and release promises | [What it is / is not](./docs/what-is-model-preflight.md) |
+| Understand compatibility and terms | [Compatibility](./docs/compatibility.md) and [terminology](./docs/terminology.md) |
 
 ---
 

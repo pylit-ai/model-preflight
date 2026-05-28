@@ -8,7 +8,12 @@ from typer.testing import CliRunner
 from model_preflight import cli
 from model_preflight.cli import app
 
-runner = CliRunner()
+runner = CliRunner(mix_stderr=False)
+
+
+def test_cli_runner_default_uses_separate_stderr_streams():
+    # Guard against accidental reliance on default CliRunner stderr mixing behavior.
+    assert runner.mix_stderr is False
 
 PROVIDER_ENV_VARS = [
     "OPENROUTER_API_KEY",
