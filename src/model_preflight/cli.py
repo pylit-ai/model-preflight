@@ -643,6 +643,14 @@ def pro(
     path: Annotated[Path | None, typer.Option("--config")] = None,
     artifact: Annotated[Path | None, typer.Option("--artifact", dir_okay=False)] = None,
     json_output: Annotated[bool, typer.Option("--json")] = False,
+    jev_select: Annotated[bool, typer.Option(
+        "--jev-select", help="Send prompt and candidates to TypeSafe for paid answer selection."
+    )] = False,
+    jev_model: Annotated[str, typer.Option("--jev-model")] = "jev-1.13.0",
+    jev_timeout: Annotated[float, typer.Option("--jev-timeout", min=0.1, max=30)] = 10,
+    jev_min_confidence: Annotated[float, typer.Option(
+        "--jev-min-confidence", min=0, max=1
+    )] = 0.8,
 ) -> None:
     """Run fanout + synthesis for a one-off prototype prompt."""
     cfg = load_config(path)
@@ -665,6 +673,10 @@ def pro(
         n=n,
         sample_group=effective_sample_group,
         judge_group=effective_judge_group,
+        jev_select=jev_select,
+        jev_model=jev_model,
+        jev_timeout=jev_timeout,
+        jev_min_confidence=jev_min_confidence,
     )
     artifact_payload = {
         "prompt": prompt,
