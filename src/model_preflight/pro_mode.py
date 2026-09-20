@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from .jev import select_answer
 from .router import ModelGateway
 
 
@@ -88,6 +89,10 @@ def pro_mode(
     tournament_group_size: int = 10,
     max_workers: int = 16,
     max_tokens: int | None = None,
+    jev_select: bool = False,
+    jev_model: str = "jev-1.13.0",
+    jev_timeout: float = 10,
+    jev_min_confidence: float = 0.8,
 ) -> dict[str, Any]:
     candidate_results = fanout(
         gateway,
@@ -98,11 +103,28 @@ def pro_mode(
         max_tokens=max_tokens,
     )
     nonempty = [c.text for c in candidate_results if c.ok and c.text.strip()]
+    selection = {}
+    if jev_select and nonempty:
+        by_id = {
+            f"candidate_{c.index}": c.text for c in candidate_results if c.ok and c.text.strip()
+        }
+        decision = select_answer(
+            prompt, by_id, model=jev_model, timeout=jev_timeout, min_confidence=jev_min_confidence
+        )
+        selection = {"selection": decision}
+        if decision["status"] == "selected":
+            return {
+                "final": by_id[decision["choice"]],
+                "candidates": [asdict(c) for c in candidate_results],
+                "group_winners": [],
+                **selection,
+            }
     if not nonempty:
         return {
             "final": "",
             "candidates": [asdict(c) for c in candidate_results],
             "group_winners": [],
+            **selection,
         }
     if len(nonempty) <= tournament_group_size:
         final = synthesize(gateway, prompt, nonempty, group=judge_group, max_tokens=max_tokens)
@@ -110,6 +132,7 @@ def pro_mode(
             "final": final,
             "candidates": [asdict(c) for c in candidate_results],
             "group_winners": [],
+            **selection,
         }
     winners = []
     for i in range(0, len(nonempty), tournament_group_size):
@@ -121,4 +144,5 @@ def pro_mode(
         "final": final,
         "candidates": [asdict(c) for c in candidate_results],
         "group_winners": winners,
+        **selection,
     }

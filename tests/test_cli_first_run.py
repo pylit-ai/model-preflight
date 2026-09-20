@@ -271,6 +271,10 @@ def test_pro_accepts_short_n_and_defaults_to_ready_group(tmp_path, monkeypatch):
             "n": 2,
             "sample_group": "offline_echo",
             "judge_group": "offline_echo",
+            "jev_select": False,
+            "jev_model": "jev-1.13.0",
+            "jev_timeout": 10,
+            "jev_min_confidence": 0.8,
         }
     ]
     assert "[mpf] pro fanout n=2 sample_group=offline_echo judge_group=offline_echo" in (
