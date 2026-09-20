@@ -2,18 +2,28 @@ from __future__ import annotations
 
 import json
 
+import typer
+from cli_test_support import separate_stream_runner
 from rich.console import Console
-from typer.testing import CliRunner
 
 from model_preflight import cli
 from model_preflight.cli import app
 
-runner = CliRunner(mix_stderr=False)
+runner = separate_stream_runner()
 
 
 def test_cli_runner_default_uses_separate_stderr_streams():
-    # Guard against accidental reliance on default CliRunner stderr mixing behavior.
-    assert runner.mix_stderr is False
+    probe = typer.Typer()
+
+    @probe.command()
+    def streams():
+        typer.echo("output")
+        typer.echo("diagnostic", err=True)
+
+    result = runner.invoke(probe, [])
+    assert result.exit_code == 0
+    assert result.stdout == "output\n"
+    assert result.stderr == "diagnostic\n"
 
 PROVIDER_ENV_VARS = [
     "OPENROUTER_API_KEY",

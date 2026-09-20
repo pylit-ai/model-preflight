@@ -6,7 +6,7 @@ from urllib.error import HTTPError, URLError
 
 import pytest
 import yaml
-from typer.testing import CliRunner
+from cli_test_support import separate_stream_runner
 
 from model_preflight import jev
 from model_preflight.cli import app
@@ -149,7 +149,7 @@ def test_cli_real_entrypoint(monkeypatch, tmp_path):
 
     calls = transport(monkeypatch, response())
     monkeypatch.setattr(cli, "ModelGateway", lambda cfg: Gateway())
-    runner = CliRunner(mix_stderr=False)
+    runner = separate_stream_runner()
     config = tmp_path / "config.yaml"
     assert (
         runner.invoke(app, ["init", "--preset", "minimal", "--config", str(config)]).exit_code == 0
@@ -197,7 +197,7 @@ def test_real_cli_availability_preserves_baseline(
 ):
     """Exercise actual CLI, fanout, adapter and gateway synthesis; mock only Jev transport."""
     calls = transport(monkeypatch, body)
-    runner = CliRunner(mix_stderr=False)
+    runner = separate_stream_runner()
     config = tmp_path / "config.yaml"
     assert (
         runner.invoke(app, ["init", "--preset", "minimal", "--config", str(config)]).exit_code == 0
