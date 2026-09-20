@@ -6,6 +6,7 @@ import json
 import math
 import os
 import re
+from time import monotonic
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
@@ -27,7 +28,17 @@ def select_answer(
     min_confidence: float = 0.8,
 ) -> dict:
     """Send explicitly authorized inputs; errors yield content-free fallback metadata."""
-    result = {"requested_model": model, "status": "fallback", "reason": "invalid_config"}
+    started = monotonic()
+    result = {
+        "requested_model": model,
+        "status": "fallback",
+        "reason": "invalid_config",
+        "attempts": 0,
+    }
+
+    def finish(**updates):
+        return {**result, **updates, "elapsed_seconds": max(0, monotonic() - started)}
+
     if (
         not _probability(min_confidence)
         or type(timeout) not in (int, float)
@@ -35,12 +46,12 @@ def select_answer(
         or not isinstance(model, str)
         or re.fullmatch(r"jev-[A-Za-z0-9._-]{1,64}", model) is None
     ):
-        return result
+        return finish()
     key = os.environ.get("TYPESAFE_API_KEY")
     if not key:
-        return {**result, "reason": "missing_key"}
+        return finish(reason="missing_key")
     if not 1 <= len(candidates) <= 253:
-        return {**result, "reason": "candidate_limit"}
+        return finish(reason="candidate_limit")
     criteria = {
         k: f"The complete answer in state.candidates[{k!r}] is adequate verbatim."
         for k in candidates
@@ -67,14 +78,16 @@ def select_answer(
         }
     ).encode()
     if len(payload) > 96_000:
-        return {**result, "reason": "payload_limit"}
+        return finish(reason="payload_limit")
     try:
         request = Request(
             "https://api.typesafe.ai/v1/systemone",
             data=payload,
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
         )
-        with build_opener(_NoRedirect()).open(request, timeout=timeout) as response:
+        opener = build_opener(_NoRedirect())
+        result["attempts"] = 1
+        with opener.open(request, timeout=timeout) as response:
             raw = response.read(65_537)
         if len(raw) > 65_536:
             raise ValueError("response limit")
@@ -107,10 +120,12 @@ def select_answer(
             choice=choice,
             confidence=answer["confidence"],
         )
+        if model not in {"jev-latest", "jev-preview"} and body["model"] != model:
+            return finish(reason="model_mismatch")
         if answer["confidence"] < min_confidence:
-            return {**result, "reason": "low_confidence"}
+            return finish(reason="low_confidence")
         if choice not in candidates:
-            return {**result, "reason": choice}
-        return {**result, "status": "selected", "reason": "complete_answer"}
+            return finish(reason=choice)
+        return finish(status="selected", reason="complete_answer")
     except Exception:  # Transport/schema failures retain the established synthesis path.
-        return {**result, "reason": "request_or_schema_failure"}
+        return finish(reason="request_or_schema_failure")

@@ -61,6 +61,8 @@ def test_opt_in_exact_copy_and_metadata(monkeypatch):
     assert gateway.synthesis == 0
     assert result["selection"]["returned_model"] == "jev-1.13.0"
     assert result["selection"]["usage"]["input_tokens"] == 100
+    assert result["selection"]["attempts"] == 1
+    assert result["selection"]["elapsed_seconds"] >= 0
     assert len(calls) == 1 and calls[0][1] == 10
     payload = json.loads(calls[0][0].data)
     assert payload["state"]["candidates"]["candidate_1"] == result["final"]
@@ -87,6 +89,8 @@ def test_fallback(monkeypatch, body):
     assert gateway.synthesis == 1 and len(calls) == 1
     assert "secret" not in json.dumps(result)
     assert result["selection"]["status"] == "fallback"
+    assert result["selection"]["attempts"] == 1
+    assert result["selection"]["elapsed_seconds"] >= 0
 
 
 @pytest.mark.parametrize(
@@ -113,7 +117,29 @@ def test_default_no_egress_and_missing_key(monkeypatch):
     monkeypatch.delenv("TYPESAFE_API_KEY")
     result = pro_mode(Gateway(), "prompt", n=2, jev_select=True)
     assert result["selection"]["reason"] == "missing_key"
+    assert result["selection"]["attempts"] == 0
+    assert result["selection"]["elapsed_seconds"] >= 0
     assert not calls
+
+
+def test_pinned_model_mismatch_falls_back_with_usage(monkeypatch):
+    body = response()
+    body["model"] = "jev-1.14.0"
+    transport(monkeypatch, body)
+    result = pro_mode(Gateway(), "prompt", n=2, jev_select=True)
+    assert result["final"] == "synthesized"
+    assert result["selection"]["reason"] == "model_mismatch"
+    assert result["selection"]["returned_model"] == "jev-1.14.0"
+    assert result["selection"]["usage"]["input_tokens"] == 100
+
+
+@pytest.mark.parametrize("alias", ["jev-latest", "jev-preview"])
+def test_explicit_model_alias_accepts_returned_version(monkeypatch, alias):
+    transport(monkeypatch, response())
+    result = pro_mode(Gateway(), "prompt", n=2, jev_select=True, jev_model=alias)
+    assert result["final"] == "  answer 1\n"
+    assert result["selection"]["requested_model"] == alias
+    assert result["selection"]["returned_model"] == "jev-1.13.0"
 
 
 def test_cli_real_entrypoint(monkeypatch, tmp_path):

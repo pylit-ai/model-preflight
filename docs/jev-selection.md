@@ -25,6 +25,12 @@ and validated reported token usage when available. Missing usage is not zero cos
 No raw TypeSafe response or transport error is logged. Existing artifacts contain
 prompts and candidates: keep them private as before. Do not submit secrets.
 
+Pinned model requests require an exact returned-model match; mismatch falls back
+while retaining validated returned-model and usage metadata. Only explicitly
+requested `jev-latest` and `jev-preview` aliases allow a different returned version.
+Every selector decision reports attempted request count (zero or one) and elapsed
+seconds, including preflight and transport fallbacks, to expose selection overhead.
+
 Contract checked against <https://docs.typesafe.ai/api> and
 <https://docs.typesafe.ai/models> on 2026-09-19. The selection rubric lives in
 `src/model_preflight/jev.py`. Downstream answer quality still needs private pilot
