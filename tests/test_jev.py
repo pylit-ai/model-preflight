@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import io
 import json
+from urllib.error import HTTPError, URLError
 
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from model_preflight import jev
@@ -46,7 +48,7 @@ def transport(monkeypatch, body):
             calls.append((request, timeout))
             if isinstance(body, Exception):
                 raise body
-            return io.BytesIO(json.dumps(body).encode())
+            return io.BytesIO(body if isinstance(body, bytes) else json.dumps(body).encode())
 
     monkeypatch.setenv("TYPESAFE_API_KEY", "test-only")
     monkeypatch.setattr(jev, "build_opener", lambda *args: Opener())
@@ -158,3 +160,84 @@ def test_cli_real_entrypoint(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert json.loads(result.stdout)["final"] == "  answer 1\n"
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("scenario", "body", "reason", "attempts"),
+    [
+        ("available", response(), "complete_answer", 1),
+        ("disabled", response(), None, 0),
+        ("no_key", response(), "missing_key", 0),
+        (
+            "unauthorized",
+            HTTPError("https://api.typesafe.ai/v1/systemone", 401, "private failure", {}, None),
+            "request_or_schema_failure",
+            1,
+        ),
+        (
+            "rate_limited",
+            HTTPError(
+                "https://api.typesafe.ai/v1/systemone",
+                429,
+                "private failure",
+                {"Retry-After": "120"},
+                None,
+            ),
+            "request_or_schema_failure",
+            1,
+        ),
+        ("unreachable", URLError("private failure"), "request_or_schema_failure", 1),
+        ("timeout", TimeoutError("private failure"), "request_or_schema_failure", 1),
+        ("malformed_json", b"private failure: not JSON", "request_or_schema_failure", 1),
+        ("malformed_schema", {}, "request_or_schema_failure", 1),
+    ],
+)
+def test_real_cli_availability_preserves_baseline(
+    monkeypatch, tmp_path, scenario, body, reason, attempts
+):
+    """Exercise actual CLI, fanout, adapter and gateway synthesis; mock only Jev transport."""
+    calls = transport(monkeypatch, body)
+    runner = CliRunner(mix_stderr=False)
+    config = tmp_path / "config.yaml"
+    assert (
+        runner.invoke(app, ["init", "--preset", "minimal", "--config", str(config)]).exit_code == 0
+    )
+    data = yaml.safe_load(config.read_text())
+    audit = tmp_path / "audit.jsonl"
+    data["router"]["audit_jsonl"] = str(audit)
+    config.write_text(yaml.safe_dump(data))
+    args = ["pro", "availability prompt", "--n", "2", "--config", str(config), "--json"]
+    baseline = runner.invoke(app, args)
+    assert baseline.exit_code == 0, baseline.output
+    baseline_payload = json.loads(baseline.stdout)
+    assert not calls
+    audit.write_text("")
+    if scenario == "no_key":
+        monkeypatch.delenv("TYPESAFE_API_KEY")
+    if scenario != "disabled":
+        args.append("--jev-select")
+    actual = runner.invoke(app, args)
+    assert actual.exit_code == 0, actual.output
+    payload = json.loads(actual.stdout)
+    assert payload["final"] == (
+        "availability prompt" if scenario == "available" else baseline_payload["final"]
+    )
+    assert payload["candidates"] == baseline_payload["candidates"]
+    phases = [json.loads(row)["metadata"]["phase"] for row in audit.read_text().splitlines()]
+    assert phases.count("fanout") == 2
+    assert phases.count("synthesis") == (0 if scenario == "available" else 1)
+    assert len(calls) == attempts
+    assert "private failure" not in actual.stdout + actual.stderr
+    if reason is None:
+        assert "selection" not in payload
+    else:
+        assert payload["selection"]["status"] == (
+            "selected" if scenario == "available" else "fallback"
+        )
+        assert payload["selection"]["reason"] == reason
+        assert payload["selection"]["attempts"] == attempts
+        assert payload["selection"]["elapsed_seconds"] >= 0
+        if scenario == "available":
+            assert payload["selection"]["usage"]["input_tokens"] == 100
+        else:
+            assert "usage" not in payload["selection"]
